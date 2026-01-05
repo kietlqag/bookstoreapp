@@ -6,10 +6,15 @@ async function createOrder(req, res, next) {
       userId,
       serviceId,
       paymentId,
-      shippingAddress,
+      shippingAddressNew,
+      shippingAddressOld,
       phoneNumber,
       note,
+      status,
       orderItems,
+      cartItemIds,
+      shippingVoucherId,
+      productVoucherId,
     } = req.body || {};
 
     const parsedUserId = Number(userId);
@@ -22,9 +27,14 @@ async function createOrder(req, res, next) {
       userId: parsedUserId,
       serviceId: Number(serviceId) || null,
       paymentId: Number(paymentId) || null,
-      shippingAddress: shippingAddress || null,
+      shippingAddressNew: shippingAddressNew || null,
+      shippingAddressOld: shippingAddressOld || null,
       phoneNumber: phoneNumber || null,
       note: note || null,
+      status: status || null,
+      cartItemIds: Array.isArray(cartItemIds) ? cartItemIds : [],
+      shippingVoucherId: shippingVoucherId || null,
+      productVoucherId: productVoucherId || null,
       items: items.map((item) => ({
         bookId: Number(item.bookId) || 0,
         quantity: Number(item.quantity) || 0,

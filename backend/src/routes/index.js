@@ -10,6 +10,10 @@ const paymentRoutes = require('./payment.routes');
 const orderRoutes = require('./order.routes');
 const reviewRoutes = require('./review.routes');
 const healthRoutes = require('./health.routes');
+const favoriteRoutes = require('./favorite.routes');
+const addressRoutes = require('./address.routes');
+const voucherRoutes = require('./voucher.routes');
+const shippingMethodRoutes = require('./shipping_method.routes');
 
 const router = Router();
 
@@ -23,5 +27,9 @@ router.use('/services', serviceRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/orders', orderRoutes);
 router.use('/reviews', reviewRoutes);
+router.use('/favorites', favoriteRoutes);
+router.use('/addresses', addressRoutes);
+router.use('/vouchers', voucherRoutes);
+router.use('/shipping-methods', shippingMethodRoutes);
 
 module.exports = router;

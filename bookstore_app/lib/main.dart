@@ -14,6 +14,7 @@ import 'models/book_service.dart';
 import 'models/cart_item.dart';
 import 'models/cart_service.dart';
 import 'models/category_service.dart';
+import 'models/favorite_service.dart';
 import 'models/review_service.dart';
 import 'screens/auth/forgot_password_page.dart';
 import 'screens/auth/login_page.dart';
@@ -45,6 +46,8 @@ class _BookStoreAppState extends State<BookStoreApp> {
       ReviewService(baseUrl: _resolveBaseUrl());
   late final CartService _cartService =
       CartService(baseUrl: _resolveBaseUrl());
+  late final FavoriteService _favoriteService =
+      FavoriteService(baseUrl: _resolveBaseUrl());
   bool _hasSeenWelcome = false;
   bool _prefsLoaded = false;
 
@@ -112,7 +115,7 @@ class _BookStoreAppState extends State<BookStoreApp> {
       price: 189000,
       rating: 4.9,
       cover:
-          'https://images.unsplash.com/photo-1455885666463-7a412624905a?auto=format&fit=crop&w=800&q=80',
+          'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=800&q=80',
       category: 'Science',
       description: 'A brief history of humankind from ancient to modern times.',
     ),
@@ -250,8 +253,13 @@ class _BookStoreAppState extends State<BookStoreApp> {
   List<Book> _books = List<Book>.from(_sampleBooks);
 
   List<CartItem> _cartItems = [];
+  Set<int> _favoriteIds = <int>{};
 
   static String _resolveBaseUrl() {
+    const overrideUrl = String.fromEnvironment('API_BASE_URL');
+    if (overrideUrl.isNotEmpty) {
+      return overrideUrl;
+    }
     if (Platform.isAndroid) {
       return 'http://192.168.1.4:8080';
     }
@@ -282,8 +290,12 @@ class _BookStoreAppState extends State<BookStoreApp> {
 
   Future<void> _socialRegister(String provider) async {
     if (provider == 'google') {
-      final account = await GoogleSignIn(scopes: ['email']).signIn();
-      if (account == null) return;
+      try {
+        final googleSignIn = GoogleSignIn(scopes: ['email']);
+        final account = await googleSignIn.signIn();
+        if (account == null) {
+          throw Exception('Đăng ký Google bị hủy hoặc thất bại.');
+        }
       final displayName = account.displayName?.trim();
       final session = await _authService.socialRegister(
         provider: 'google',
@@ -294,6 +306,10 @@ class _BookStoreAppState extends State<BookStoreApp> {
       );
       _applySession(session);
       return;
+      } catch (error) {
+        debugPrint('Google register error: $error');
+        rethrow;
+      }
     }
 
     if (provider == 'facebook') {
@@ -320,15 +336,23 @@ class _BookStoreAppState extends State<BookStoreApp> {
 
   Future<void> _socialLogin(String provider) async {
     if (provider == 'google') {
-      final account = await GoogleSignIn(scopes: ['email']).signIn();
-      if (account == null) return;
-      final session = await _authService.socialLogin(
-        provider: 'google',
-        providerUserId: account.id,
-        email: account.email,
-      );
-      _applySession(session);
-      return;
+      try {
+        final googleSignIn = GoogleSignIn(scopes: ['email']);
+        final account = await googleSignIn.signIn();
+        if (account == null) {
+          throw Exception('Đăng nhập Google bị hủy hoặc thất bại.');
+        }
+        final session = await _authService.socialLogin(
+          provider: 'google',
+          providerUserId: account.id,
+          email: account.email,
+        );
+        _applySession(session);
+        return;
+      } catch (error) {
+        debugPrint('Google login error: $error');
+        rethrow;
+      }
     }
 
     if (provider == 'facebook') {
@@ -360,17 +384,22 @@ class _BookStoreAppState extends State<BookStoreApp> {
       _session = session;
     });
     _loadCartForUser(session.userId);
+    _loadFavoritesForUser(session.userId);
     _navigatorKey.currentState?.pushAndRemoveUntil(
       MaterialPageRoute(
         builder: (_) => HomePage(
           books: _books,
           cartItems: _cartItems,
+          favoriteIds: _favoriteIds,
           categoryService: _categoryService,
           onOpenBook: _openBookDetail,
           onIncreaseCart: _increaseCart,
           onDecreaseCart: _decreaseCart,
           onRemoveCart: _removeCart,
+          onOrderCompleted: _removeCartItemsLocal,
+          onToggleFavorite: _toggleFavorite,
           onLogout: _logout,
+          userId: session.userId,
         ),
       ),
       (route) => false,
@@ -415,6 +444,19 @@ class _BookStoreAppState extends State<BookStoreApp> {
     }
   }
 
+  Future<void> _loadFavoritesForUser(int userId) async {
+    if (userId <= 0) return;
+    try {
+      final ids = await _favoriteService.fetchFavoriteIds(userId);
+      if (!mounted) return;
+      setState(() {
+        _favoriteIds = ids;
+      });
+    } catch (_) {
+      // Keep local favorites when the backend is unavailable.
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -426,6 +468,7 @@ class _BookStoreAppState extends State<BookStoreApp> {
     setState(() {
       _session = null;
       _cartItems = [];
+      _favoriteIds = <int>{};
     });
     _navigatorKey.currentState?.pushAndRemoveUntil(
       MaterialPageRoute(
@@ -526,6 +569,46 @@ class _BookStoreAppState extends State<BookStoreApp> {
     });
   }
 
+  void _removeCartItemsLocal(List<int> cartItemIds) {
+    if (cartItemIds.isEmpty) return;
+    final ids = cartItemIds.toSet();
+    setState(() {
+      _cartItems.removeWhere((current) => ids.contains(current.id));
+    });
+  }
+
+  Future<bool> _toggleFavorite(Book book) async {
+    final session = _session;
+    if (session == null || session.userId <= 0) {
+      throw Exception('Vui lòng đăng nhập để yêu thích sách.');
+    }
+
+    final isFavorite = _favoriteIds.contains(book.id);
+    if (isFavorite) {
+      await _favoriteService.removeFavorite(
+        userId: session.userId,
+        bookId: book.id,
+      );
+    } else {
+      await _favoriteService.addFavorite(
+        userId: session.userId,
+        bookId: book.id,
+      );
+    }
+
+    if (!mounted) return !isFavorite;
+    setState(() {
+      final updated = Set<int>.from(_favoriteIds);
+      if (isFavorite) {
+        updated.remove(book.id);
+      } else {
+        updated.add(book.id);
+      }
+      _favoriteIds = updated;
+    });
+    return !isFavorite;
+  }
+
   void _openBookDetail(Book book) {
     _navigatorKey.currentState?.push(
       MaterialPageRoute(
@@ -533,7 +616,10 @@ class _BookStoreAppState extends State<BookStoreApp> {
           book: book,
           bookService: _bookService,
           reviewService: _reviewService,
+          isFavorite: _favoriteIds.contains(book.id),
+          onToggleFavorite: _toggleFavorite,
           onAddToCart: _addToCartWithQuantity,
+          userId: _session?.userId ?? 0,
         ),
       ),
     );
@@ -607,12 +693,16 @@ class _BookStoreAppState extends State<BookStoreApp> {
           ? HomePage(
               books: _books,
               cartItems: _cartItems,
+              favoriteIds: _favoriteIds,
               categoryService: _categoryService,
               onOpenBook: _openBookDetail,
               onIncreaseCart: _increaseCart,
               onDecreaseCart: _decreaseCart,
               onRemoveCart: _removeCart,
+              onOrderCompleted: _removeCartItemsLocal,
+              onToggleFavorite: _toggleFavorite,
               onLogout: _logout,
+              userId: _session?.userId ?? 0,
             )
           : (_hasSeenWelcome
               ? LoginPage(

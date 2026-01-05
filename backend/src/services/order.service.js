@@ -5,10 +5,15 @@ async function createOrder({
   userId,
   serviceId,
   paymentId,
-  shippingAddress,
+  shippingAddressNew,
+  shippingAddressOld,
   phoneNumber,
   note,
+  status,
   items,
+  cartItemIds,
+  shippingVoucherId,
+  productVoucherId,
 }) {
   const totalPrice = items.reduce((sum, item) => {
     const price = Number(item.price) || 0;
@@ -20,11 +25,16 @@ async function createOrder({
     userId,
     serviceId,
     paymentId,
-    shippingAddress,
+    shippingAddressNew,
+    shippingAddressOld,
     phoneNumber,
     note,
+    status,
     items,
     totalPrice,
+    cartItemIds,
+    shippingVoucherId,
+    productVoucherId,
   });
 
   return { id: order.id };

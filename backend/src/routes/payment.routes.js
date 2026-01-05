@@ -1,8 +1,11 @@
-﻿const { Router } = require('express');
+const { Router } = require('express');
 const paymentController = require('../controllers/payment.controller');
 
 const router = Router();
 
-router.post('/', paymentController.createPayment);
+router.get('/methods', paymentController.listMethods);
+router.post('/initiate', paymentController.initiatePayment);
+router.post('/webhook/momo', paymentController.handleMomoWebhook);
+router.post('/webhook/vietqr', paymentController.handleVietqrWebhook);
 
 module.exports = router;

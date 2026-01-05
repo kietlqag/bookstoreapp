@@ -11,7 +11,6 @@ void showTopMessage(
   Duration duration = const Duration(seconds: 3),
 }) {
   final overlay = Overlay.of(context);
-  if (overlay == null) return;
 
   final entry = OverlayEntry(
     builder: (context) => _TopMessageEntry(message: message, type: type),
@@ -51,7 +50,6 @@ class _TopMessageEntry extends StatelessWidget {
         icon = Icons.error_outline;
         break;
       case TopMessageType.info:
-      default:
         background = AppColors.gray900;
         icon = Icons.info_outline;
     }

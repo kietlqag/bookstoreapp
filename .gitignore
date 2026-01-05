@@ -1,7 +1,0 @@
-.env
-.env.*
-!.env.example
-femock/
-**/node_modules/
-bookstore_app/android/app/google-services.json
-bookstore_app/android/app/src/main/res/values/strings.facebook.xml

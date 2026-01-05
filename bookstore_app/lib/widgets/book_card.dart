@@ -9,11 +9,15 @@ class BookCard extends StatelessWidget {
     super.key,
     required this.book,
     this.onTap,
+    this.isFavorite = false,
+    this.onFavoriteTap,
     this.compact = false,
   });
 
   final Book book;
   final VoidCallback? onTap;
+  final bool isFavorite;
+  final VoidCallback? onFavoriteTap;
   final bool compact;
 
   @override
@@ -108,10 +112,18 @@ class BookCard extends StatelessWidget {
                             color: Colors.white.withOpacity(0.9),
                             shape: BoxShape.circle,
                           ),
-                          child: const Icon(
-                            Icons.favorite_border,
-                            size: 18,
-                            color: AppColors.gray600,
+                          child: InkWell(
+                            onTap: onFavoriteTap,
+                            borderRadius: BorderRadius.circular(16),
+                            child: Icon(
+                              isFavorite
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              size: 18,
+                              color: isFavorite
+                                  ? Colors.redAccent
+                                  : AppColors.gray600,
+                            ),
                           ),
                         ),
                       ),

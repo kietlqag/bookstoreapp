@@ -3,18 +3,23 @@
 import '../models/book.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/book_card.dart';
+import '../widgets/top_message.dart';
 
 class CategoryBooksPage extends StatefulWidget {
   const CategoryBooksPage({
     super.key,
     required this.category,
     required this.books,
+    required this.favoriteIds,
     required this.onOpenBook,
+    required this.onToggleFavorite,
   });
 
   final String category;
   final List<Book> books;
+  final Set<int> favoriteIds;
   final ValueChanged<Book> onOpenBook;
+  final Future<bool> Function(Book book) onToggleFavorite;
 
   @override
   State<CategoryBooksPage> createState() => _CategoryBooksPageState();
@@ -35,6 +40,20 @@ class _CategoryBooksPageState extends State<CategoryBooksPage> {
     output = output.replaceAll(RegExp(r'đ'), 'd');
     output = output.replaceAll(RegExp(r'\s+'), ' ').trim();
     return output;
+  }
+
+  Future<void> _handleFavorite(Book book) async {
+    try {
+      await widget.onToggleFavorite(book);
+      if (!mounted) return;
+      setState(() {});
+    } catch (error) {
+      showTopMessage(
+        context,
+        message: error.toString(),
+        type: TopMessageType.error,
+      );
+    }
   }
 
   @override
@@ -176,6 +195,8 @@ class _CategoryBooksPageState extends State<CategoryBooksPage> {
                         book: book,
                         compact: true,
                         onTap: () => widget.onOpenBook(book),
+                        isFavorite: widget.favoriteIds.contains(book.id),
+                        onFavoriteTap: () => _handleFavorite(book),
                       );
                     },
                   ),

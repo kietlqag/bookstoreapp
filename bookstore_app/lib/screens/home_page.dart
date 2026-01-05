@@ -11,11 +11,13 @@ import '../widgets/category_chip.dart';
 import '../widgets/header.dart';
 import '../widgets/price_formatter.dart';
 import '../widgets/search_bar.dart';
+import '../widgets/top_message.dart';
 import 'cart_page.dart';
 import 'category_books_page.dart';
 import 'contact_page.dart';
 import 'best_seller_books_page.dart';
 import 'featured_books_page.dart';
+import 'favorites_page.dart';
 import 'profile_page.dart';
 import 'search_page.dart';
 
@@ -24,22 +26,37 @@ class HomePage extends StatefulWidget {
     super.key,
     required this.books,
     required this.cartItems,
+    required this.favoriteIds,
     required this.categoryService,
     required this.onOpenBook,
     required this.onIncreaseCart,
     required this.onDecreaseCart,
     required this.onRemoveCart,
+    required this.onOrderCompleted,
+    required this.onToggleFavorite,
     required this.onLogout,
+    required this.userId,
   });
+
+  static final ValueNotifier<String> tabNotifier =
+      ValueNotifier<String>('home');
+
+  static void setActiveTab(String tab) {
+    tabNotifier.value = tab;
+  }
 
   final List<Book> books;
   final List<CartItem> cartItems;
+  final Set<int> favoriteIds;
   final CategoryService categoryService;
   final ValueChanged<Book> onOpenBook;
   final ValueChanged<CartItem> onIncreaseCart;
   final ValueChanged<CartItem> onDecreaseCart;
   final ValueChanged<CartItem> onRemoveCart;
+  final ValueChanged<List<int>> onOrderCompleted;
+  final Future<bool> Function(Book book) onToggleFavorite;
   final VoidCallback onLogout;
+  final int userId;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -47,11 +64,35 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   String _activeTab = 'home';
+  late final VoidCallback _tabListener;
 
   void _handleTabChange(String tab) {
+    if (HomePage.tabNotifier.value != tab) {
+      HomePage.tabNotifier.value = tab;
+    }
     setState(() {
       _activeTab = tab;
     });
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _activeTab = HomePage.tabNotifier.value;
+    _tabListener = () {
+      final next = HomePage.tabNotifier.value;
+      if (!mounted || next == _activeTab) return;
+      setState(() {
+        _activeTab = next;
+      });
+    };
+    HomePage.tabNotifier.addListener(_tabListener);
+  }
+
+  @override
+  void dispose() {
+    HomePage.tabNotifier.removeListener(_tabListener);
+    super.dispose();
   }
 
   @override
@@ -59,16 +100,26 @@ class _HomePageState extends State<HomePage> {
     final pages = {
       'home': _HomeTab(
         books: widget.books,
+        favoriteIds: widget.favoriteIds,
         categoryService: widget.categoryService,
         onOpenBook: widget.onOpenBook,
         onOpenSearch: () => _handleTabChange('search'),
+        onToggleFavorite: widget.onToggleFavorite,
       ),
-      'search': SearchPage(books: widget.books, onOpenBook: widget.onOpenBook),
+      'search': SearchPage(
+        books: widget.books,
+        favoriteIds: widget.favoriteIds,
+        onOpenBook: widget.onOpenBook,
+        onToggleFavorite: widget.onToggleFavorite,
+      ),
       'cart': CartPage(
         cartItems: widget.cartItems,
         onIncrease: widget.onIncreaseCart,
         onDecrease: widget.onDecreaseCart,
         onRemove: widget.onRemoveCart,
+        onOpenBook: widget.onOpenBook,
+        onOrderCompleted: widget.onOrderCompleted,
+        userId: widget.userId,
       ),
       'contact': const ContactPage(),
       'profile': ProfilePage(onLogout: widget.onLogout),
@@ -94,15 +145,19 @@ class _HomePageState extends State<HomePage> {
 class _HomeTab extends StatefulWidget {
   const _HomeTab({
     required this.books,
+    required this.favoriteIds,
     required this.categoryService,
     required this.onOpenBook,
     required this.onOpenSearch,
+    required this.onToggleFavorite,
   });
 
   final List<Book> books;
+  final Set<int> favoriteIds;
   final CategoryService categoryService;
   final ValueChanged<Book> onOpenBook;
   final VoidCallback onOpenSearch;
+  final Future<bool> Function(Book book) onToggleFavorite;
 
   @override
   State<_HomeTab> createState() => _HomeTabState();
@@ -111,7 +166,7 @@ class _HomeTab extends StatefulWidget {
 class _HomeTabState extends State<_HomeTab> {
   final TextEditingController _searchController = TextEditingController();
   List<String> _categories = const ['Tất cả'];
-  String _selectedCategory = 'Tất cả';
+  String _selectedCategory = '';
   final PageController _flashController =
       PageController(viewportFraction: 0.9);
   int _flashIndex = 0;
@@ -119,6 +174,20 @@ class _HomeTabState extends State<_HomeTab> {
   Timer? _flashTimer;
   Timer? _countdownTimer;
   Duration _timeLeft = const Duration();
+
+  Future<void> _handleFavorite(Book book) async {
+    try {
+      await widget.onToggleFavorite(book);
+      if (!mounted) return;
+      setState(() {});
+    } catch (error) {
+      showTopMessage(
+        context,
+        message: error.toString(),
+        type: TopMessageType.error,
+      );
+    }
+  }
 
   @override
   void initState() {
@@ -156,7 +225,7 @@ class _HomeTabState extends State<_HomeTab> {
       setState(() {
         _categories = ['Tất cả', ...names];
         if (!_categories.contains(_selectedCategory)) {
-          _selectedCategory = 'Tất cả';
+          _selectedCategory = '';
         }
       });
     } catch (_) {
@@ -197,6 +266,7 @@ class _HomeTabState extends State<_HomeTab> {
           ),
           iconColor: Colors.white,
           showDivider: false,
+          favoriteCount: widget.favoriteIds.length,
           titleFlex: 0,
           middleFlex: 7,
           leadingSpacing: 0,
@@ -210,6 +280,18 @@ class _HomeTabState extends State<_HomeTab> {
             iconColor: Colors.white,
             hintColor: Colors.white70,
           ),
+          onFavoriteTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => FavoritesPage(
+                  books: widget.books,
+                  favoriteIds: widget.favoriteIds,
+                  onOpenBook: widget.onOpenBook,
+                  onToggleFavorite: widget.onToggleFavorite,
+                ),
+              ),
+            );
+          },
         ),
         Expanded(
           child: ListView(
@@ -302,7 +384,9 @@ class _HomeTabState extends State<_HomeTab> {
                             builder: (_) => CategoryBooksPage(
                               category: category,
                               books: widget.books,
+                              favoriteIds: widget.favoriteIds,
                               onOpenBook: widget.onOpenBook,
+                              onToggleFavorite: widget.onToggleFavorite,
                             ),
                           ),
                         );
@@ -325,7 +409,9 @@ class _HomeTabState extends State<_HomeTab> {
               MaterialPageRoute(
                 builder: (_) => FeaturedBooksPage(
                   books: widget.books,
+                  favoriteIds: widget.favoriteIds,
                   onOpenBook: widget.onOpenBook,
+                  onToggleFavorite: widget.onToggleFavorite,
                 ),
               ),
             );
@@ -336,17 +422,19 @@ class _HomeTabState extends State<_HomeTab> {
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             scrollDirection: Axis.horizontal,
-            itemBuilder: (context, index) {
-              final book = featuredBooks[index];
-              return SizedBox(
-                width: 150,
-                child: BookCard(
-                  book: book,
-                  compact: true,
-                  onTap: () => widget.onOpenBook(book),
-                ),
-              );
-            },
+                    itemBuilder: (context, index) {
+                      final book = featuredBooks[index];
+                      return SizedBox(
+                        width: 150,
+                        child: BookCard(
+                          book: book,
+                          compact: true,
+                          onTap: () => widget.onOpenBook(book),
+                          isFavorite: widget.favoriteIds.contains(book.id),
+                          onFavoriteTap: () => _handleFavorite(book),
+                        ),
+                      );
+                    },
             separatorBuilder: (_, __) => const SizedBox(width: 12),
             itemCount: featuredBooks.length,
           ),
@@ -360,7 +448,9 @@ class _HomeTabState extends State<_HomeTab> {
               MaterialPageRoute(
                 builder: (_) => BestSellerBooksPage(
                   books: widget.books,
+                  favoriteIds: widget.favoriteIds,
                   onOpenBook: widget.onOpenBook,
+                  onToggleFavorite: widget.onToggleFavorite,
                 ),
               ),
             );
@@ -371,17 +461,19 @@ class _HomeTabState extends State<_HomeTab> {
           child: ListView.separated(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             scrollDirection: Axis.horizontal,
-            itemBuilder: (context, index) {
-              final book = bestSellerTop5[index];
-              return SizedBox(
-                width: 150,
-                child: BookCard(
-                  book: book,
-                  compact: true,
-                  onTap: () => widget.onOpenBook(book),
-                ),
-              );
-            },
+                    itemBuilder: (context, index) {
+                      final book = bestSellerTop5[index];
+                      return SizedBox(
+                        width: 150,
+                        child: BookCard(
+                          book: book,
+                          compact: true,
+                          onTap: () => widget.onOpenBook(book),
+                          isFavorite: widget.favoriteIds.contains(book.id),
+                          onFavoriteTap: () => _handleFavorite(book),
+                        ),
+                      );
+                    },
             separatorBuilder: (_, __) => const SizedBox(width: 12),
             itemCount: bestSellerTop5.length,
           ),

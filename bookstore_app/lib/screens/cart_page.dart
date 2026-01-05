@@ -1,9 +1,11 @@
 ﻿import 'package:flutter/material.dart';
 
+import '../models/book.dart';
 import '../models/cart_item.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/cart_item_card.dart';
 import '../widgets/price_formatter.dart';
+import 'checkout_page.dart';
 
 class CartPage extends StatefulWidget {
   const CartPage({
@@ -12,12 +14,18 @@ class CartPage extends StatefulWidget {
     required this.onIncrease,
     required this.onDecrease,
     required this.onRemove,
+    required this.onOpenBook,
+    required this.onOrderCompleted,
+    required this.userId,
   });
 
   final List<CartItem> cartItems;
   final ValueChanged<CartItem> onIncrease;
   final ValueChanged<CartItem> onDecrease;
   final ValueChanged<CartItem> onRemove;
+  final ValueChanged<Book> onOpenBook;
+  final ValueChanged<List<int>> onOrderCompleted;
+  final int userId;
 
   @override
   State<CartPage> createState() => _CartPageState();
@@ -45,6 +53,23 @@ class _CartPageState extends State<CartPage> {
   double _itemPrice(CartItem item) {
     final discountRate = (item.book.discount / 100).clamp(0.0, 1.0);
     return (item.book.price * (1 - discountRate)).clamp(0.0, double.infinity);
+  }
+
+  void _openCheckout(List<CartItem> items) {
+    if (items.isEmpty) return;
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CheckoutPage(
+          items: items,
+          userId: widget.userId,
+          onOrderCompleted: widget.onOrderCompleted,
+        ),
+      ),
+    );
+  }
+
+  void _openBookDetail(CartItem item) {
+    widget.onOpenBook(item.book);
   }
 
   Future<void> _confirmDecrease(CartItem item) async {
@@ -279,14 +304,15 @@ class _CartPageState extends State<CartPage> {
                                     } else {
                                       _selectedIds.remove(item.id);
                                     }
-                                });
-                              },
-                              onRemove: () => widget.onRemove(item),
-                              onIncrease: () => widget.onIncrease(item),
-                              onDecrease: () => _confirmDecrease(item),
+                                  });
+                                },
+                                onTap: () => _openBookDetail(item),
+                                onRemove: () => widget.onRemove(item),
+                                onIncrease: () => widget.onIncrease(item),
+                                onDecrease: () => _confirmDecrease(item),
+                              ),
                             ),
                           ),
-                        ),
                         ],
                       ),
                       Align(
@@ -335,7 +361,7 @@ class _CartPageState extends State<CartPage> {
                                 Expanded(
                                   child: FilledButton(
                                     onPressed:
-                                        selectedItems.isEmpty ? null : () {},
+                                        selectedItems.isEmpty ? null : () => _openCheckout(selectedItems),
                                     style: FilledButton.styleFrom(
                                       backgroundColor: AppColors.orange600,
                                       padding: const EdgeInsets.symmetric(
@@ -357,3 +383,4 @@ class _CartPageState extends State<CartPage> {
     );
   }
 }
+

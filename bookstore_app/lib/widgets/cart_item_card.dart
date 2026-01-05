@@ -10,6 +10,7 @@ class CartItemCard extends StatelessWidget {
     required this.item,
     required this.isSelected,
     required this.onSelected,
+    required this.onTap,
     required this.onRemove,
     required this.onIncrease,
     required this.onDecrease,
@@ -18,6 +19,7 @@ class CartItemCard extends StatelessWidget {
   final CartItem item;
   final bool isSelected;
   final ValueChanged<bool> onSelected;
+  final VoidCallback onTap;
   final VoidCallback onRemove;
   final VoidCallback onIncrease;
   final VoidCallback onDecrease;
@@ -27,129 +29,148 @@ class CartItemCard extends StatelessWidget {
     final discountRate = (item.book.discount / 100).clamp(0.0, 1.0);
     final displayPrice =
         (item.book.price * (1 - discountRate)).clamp(0.0, double.infinity);
-    final hasDiscount = item.book.discount > 0;
 
-    return Container(
-      padding: const EdgeInsets.fromLTRB(6, 12, 12, 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 26,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Transform.scale(
-                scale: 0.9,
-                child: Checkbox(
-                  value: isSelected,
-                  onChanged: (value) => onSelected(value ?? false),
-                  activeColor: AppColors.orange600,
-                  visualDensity: VisualDensity.compact,
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(6, 12, 12, 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
               ),
-            ),
+            ],
           ),
-          const SizedBox(width: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(12),
-            child: SizedBox(
-              width: 70,
-              height: 96,
-              child: Image.network(
-                item.book.cover,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) {
-                  return Container(
-                    color: AppColors.gray100,
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      Icons.menu_book,
-                      color: AppColors.gray600,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 26,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Transform.scale(
+                    scale: 0.9,
+                    child: Checkbox(
+                      value: isSelected,
+                      onChanged: (value) => onSelected(value ?? false),
+                      activeColor: AppColors.orange600,
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
-                  );
-                },
+                  ),
+                ),
               ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  item.book.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.gray900,
-                      ),
+              const SizedBox(width: 8),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: 70,
+                  height: 96,
+                  child: Image.network(
+                    item.book.cover,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) {
+                      return Container(
+                        color: AppColors.gray100,
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.menu_book,
+                          color: AppColors.gray600,
+                        ),
+                      );
+                    },
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  item.book.author,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: AppColors.gray600),
-                ),
-                const SizedBox(height: 6),
-                const SizedBox(height: 8),
-                Row(
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Text(
-                            formatPrice(displayPrice),
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(
-                                  color: AppColors.orange600,
-                                  fontWeight: FontWeight.w700,
-                                ),
+                    Text(
+                      item.book.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.gray900,
                           ),
-                        ],
-                      ),
                     ),
+                    const SizedBox(height: 4),
+                    Text(
+                      item.book.author,
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.copyWith(color: AppColors.gray600),
+                    ),
+                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
-                        _QuantityButton(
-                          icon: Icons.remove,
-                          onTap: onDecrease,
-                        ),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 6),
-                          child: Text(
-                            item.quantity.toString(),
-                            style: Theme.of(context)
-                                .textTheme
-                                .bodyMedium
-                                ?.copyWith(fontWeight: FontWeight.w600),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                formatPrice(displayPrice),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(
+                                      color: AppColors.orange600,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                formatPrice(item.book.price),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodySmall
+                                    ?.copyWith(
+                                      fontSize: 10,
+                                      color: AppColors.gray400,
+                                      decoration: TextDecoration.lineThrough,
+                                    ),
+                              ),
+                            ],
                           ),
                         ),
-                        _QuantityButton(icon: Icons.add, onTap: onIncrease),
+                        Row(
+                          children: [
+                            _QuantityButton(
+                              icon: Icons.remove,
+                              onTap: onDecrease,
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 6),
+                              child: Text(
+                                item.quantity.toString(),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .bodyMedium
+                                    ?.copyWith(fontWeight: FontWeight.w600),
+                              ),
+                            ),
+                            _QuantityButton(icon: Icons.add, onTap: onIncrease),
+                          ],
+                        ),
                       ],
                     ),
                   ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

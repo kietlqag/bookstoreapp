@@ -4,26 +4,35 @@ async function createOrderWithItems({
   userId,
   serviceId,
   paymentId,
-  shippingAddress,
+  shippingAddressNew,
+  shippingAddressOld,
   phoneNumber,
   note,
+  status,
   items,
   totalPrice,
+  cartItemIds,
+  shippingVoucherId,
+  productVoucherId,
 }) {
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
     const orderResult = await client.query(
-      'INSERT INTO "Order" ("userId", "serviceId", "paymentId", "shippingAddress", "phoneNumber", note, "totalPrice") '
-        + 'VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      'INSERT INTO "Order" ("userId", "serviceId", "paymentId", '
+        + '"shippingAddressNew", "shippingAddressOld", '
+        + '"phoneNumber", note, "totalPrice", status) '
+        + 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
       [
         userId,
         serviceId,
         paymentId,
-        shippingAddress,
+        shippingAddressNew,
+        shippingAddressOld,
         phoneNumber,
         note,
         totalPrice,
+        status || 'pending_confirmation',
       ],
     );
 
@@ -34,6 +43,44 @@ async function createOrderWithItems({
         'INSERT INTO "OrderItem" ("orderId", "bookId", quantity, price) VALUES ($1, $2, $3, $4)',
         [order.id, item.bookId, item.quantity, item.price],
       );
+    }
+
+    for (const item of items) {
+      const quantity = Number(item.quantity) || 0;
+      if (quantity <= 0 || !item.bookId) continue;
+      await client.query(
+        'UPDATE "Inventory" '
+          + 'SET "totalQuantity" = GREATEST("totalQuantity" - $1, 0), '
+          + '"remainingQuantity" = GREATEST("remainingQuantity" - $1, 0), '
+          + '"soldQuantity" = "soldQuantity" + $1, '
+          + '"updatedAt" = NOW() '
+          + 'WHERE "bookId" = $2',
+        [quantity, item.bookId],
+      );
+    }
+
+    const voucherIds = [
+      shippingVoucherId ? Number(shippingVoucherId) : null,
+      productVoucherId ? Number(productVoucherId) : null,
+    ].filter((id) => Number.isInteger(id) && id > 0);
+    for (const voucherId of [...new Set(voucherIds)]) {
+      await client.query(
+        'UPDATE "Voucher" SET "usedCount" = "usedCount" + 1, "updatedAt" = NOW() '
+          + 'WHERE id = $1',
+        [voucherId],
+      );
+    }
+
+    if (Array.isArray(cartItemIds) && cartItemIds.length > 0) {
+      const cleanedIds = cartItemIds
+        .map((id) => Number(id))
+        .filter((id) => Number.isInteger(id) && id > 0);
+      if (cleanedIds.length > 0) {
+        await client.query(
+          'DELETE FROM "CartItem" WHERE id = ANY($1::int[]) AND "userId" = $2',
+          [cleanedIds, userId],
+        );
+      }
     }
 
     await client.query('COMMIT');

@@ -9,6 +9,8 @@ class HeaderBar extends StatelessWidget {
     this.showBack = false,
     this.onBack,
     this.actions,
+    this.onFavoriteTap,
+    this.favoriteCount,
     this.backgroundGradient,
     this.backgroundColor,
     this.titleColor,
@@ -27,6 +29,8 @@ class HeaderBar extends StatelessWidget {
   final bool showBack;
   final VoidCallback? onBack;
   final List<Widget>? actions;
+  final VoidCallback? onFavoriteTap;
+  final int? favoriteCount;
   final Gradient? backgroundGradient;
   final Color? backgroundColor;
   final Color? titleColor;
@@ -103,9 +107,10 @@ class HeaderBar extends StatelessWidget {
               children: [
                 _NotificationButton(iconColor: iconColor),
                 SizedBox(width: 6),
-                _IconButton(
-                  icon: Icons.favorite_border,
+                _FavoriteButton(
                   iconColor: iconColor,
+                  count: favoriteCount ?? 0,
+                  onPressed: onFavoriteTap,
                 ),
               ],
             ),
@@ -176,6 +181,54 @@ class _NotificationButton extends StatelessWidget {
             ),
           ),
         ),
+      ],
+    );
+  }
+}
+
+class _FavoriteButton extends StatelessWidget {
+  const _FavoriteButton({
+    this.iconColor,
+    this.count = 0,
+    this.onPressed,
+  });
+
+  final Color? iconColor;
+  final int count;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        _IconButton(
+          icon: Icons.favorite_border,
+          iconColor: iconColor,
+          onPressed: onPressed,
+        ),
+        if (count > 0)
+          Positioned(
+            right: 2,
+            top: 1,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 0.5),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(7),
+              ),
+              constraints: const BoxConstraints(minWidth: 12),
+              child: Text(
+                count > 99 ? '99+' : count.toString(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.orange600,
+                  fontSize: 8,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
       ],
     );
   }

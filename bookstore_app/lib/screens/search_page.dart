@@ -7,12 +7,22 @@ import '../widgets/book_card.dart';
 import '../widgets/category_chip.dart';
 import '../widgets/header.dart';
 import '../widgets/search_bar.dart';
+import '../widgets/top_message.dart';
+import 'favorites_page.dart';
 
 class SearchPage extends StatefulWidget {
-  const SearchPage({super.key, required this.books, required this.onOpenBook});
+  const SearchPage({
+    super.key,
+    required this.books,
+    required this.favoriteIds,
+    required this.onOpenBook,
+    required this.onToggleFavorite,
+  });
 
   final List<Book> books;
+  final Set<int> favoriteIds;
   final ValueChanged<Book> onOpenBook;
+  final Future<bool> Function(Book book) onToggleFavorite;
 
   @override
   State<SearchPage> createState() => _SearchPageState();
@@ -91,6 +101,20 @@ class _SearchPageState extends State<SearchPage> {
     _saveRecentSearches();
   }
 
+  Future<void> _handleFavorite(Book book) async {
+    try {
+      await widget.onToggleFavorite(book);
+      if (!mounted) return;
+      setState(() {});
+    } catch (error) {
+      showTopMessage(
+        context,
+        message: error.toString(),
+        type: TopMessageType.error,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final categories = [
@@ -137,6 +161,18 @@ class _SearchPageState extends State<SearchPage> {
                 iconColor: Colors.white,
                 hintColor: Colors.white70,
               ),
+              onFavoriteTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => FavoritesPage(
+                      books: widget.books,
+                      favoriteIds: widget.favoriteIds,
+                      onOpenBook: widget.onOpenBook,
+                      onToggleFavorite: widget.onToggleFavorite,
+                    ),
+                  ),
+                );
+              },
             ),
             Expanded(
               child: ListView(
@@ -257,6 +293,8 @@ class _SearchPageState extends State<SearchPage> {
                           book: book,
                           compact: true,
                           onTap: () => widget.onOpenBook(book),
+                          isFavorite: widget.favoriteIds.contains(book.id),
+                          onFavoriteTap: () => _handleFavorite(book),
                         );
                       },
                     ),

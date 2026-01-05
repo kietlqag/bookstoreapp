@@ -2,12 +2,14 @@
 
 import '../models/book.dart';
 import '../models/book_service.dart';
+import '../models/cart_item.dart';
 import '../models/review.dart';
 import '../models/review_service.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/header.dart';
 import '../widgets/price_formatter.dart';
 import '../widgets/top_message.dart';
+import 'package:bookstore_app/screens/checkout_page.dart';
 
 class BookDetailPage extends StatefulWidget {
   const BookDetailPage({
@@ -15,13 +17,19 @@ class BookDetailPage extends StatefulWidget {
     required this.book,
     required this.bookService,
     required this.reviewService,
+    required this.isFavorite,
+    required this.onToggleFavorite,
     required this.onAddToCart,
+    required this.userId,
   });
 
   final Book book;
   final BookService bookService;
   final ReviewService reviewService;
+  final bool isFavorite;
+  final Future<bool> Function(Book book) onToggleFavorite;
   final void Function(Book book, int quantity) onAddToCart;
+  final int userId;
 
   @override
   State<BookDetailPage> createState() => _BookDetailPageState();
@@ -38,6 +46,7 @@ class _BookDetailPageState extends State<BookDetailPage> {
   void initState() {
     super.initState();
     _book = widget.book;
+    _isFavorite = widget.isFavorite;
     _loadDetail();
   }
 
@@ -59,9 +68,8 @@ class _BookDetailPageState extends State<BookDetailPage> {
     }
   }
 
-  Future<void> _handleAddToCart() async {
-    final book = _book ?? widget.book;
-    final selected = await showModalBottomSheet<int>(
+  Future<int?> _selectQuantity(Book book, String actionLabel) {
+    return showModalBottomSheet<int>(
       context: context,
       showDragHandle: true,
       shape: const RoundedRectangleBorder(
@@ -140,7 +148,7 @@ class _BookDetailPageState extends State<BookDetailPage> {
                         backgroundColor: AppColors.orange600,
                         padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
-                      child: const Text('Thêm vào giỏ'),
+                      child: Text(actionLabel),
                     ),
                   ),
                 ],
@@ -150,13 +158,29 @@ class _BookDetailPageState extends State<BookDetailPage> {
         );
       },
     );
+  }
 
-    if (selected == null || selected <= 0) return;
+  Future<void> _handleAddToCart() async {
+    final book = _book ?? widget.book;
+    final selected = await _selectQuantity(book, 'Thêm vào giỏ');
+    if (!mounted || selected == null || selected <= 0) return;
     widget.onAddToCart(book, selected);
     showTopMessage(
       context,
       message: 'Đã thêm vào giỏ hàng',
       type: TopMessageType.success,
+    );
+  }
+
+  Future<void> _handleBuyNow() async {
+    final book = _book ?? widget.book;
+    final selected = await _selectQuantity(book, 'Mua ngay');
+    if (!mounted || selected == null || selected <= 0) return;
+    final item = CartItem(id: 0, book: book, quantity: selected);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CheckoutPage(items: [item], userId: widget.userId),
+      ),
     );
   }
 
@@ -179,14 +203,33 @@ class _BookDetailPageState extends State<BookDetailPage> {
             HeaderBar(
               showBack: true,
               onBack: () => Navigator.of(context).pop(),
+              backgroundGradient: const LinearGradient(
+                colors: [AppColors.orange600, AppColors.rose500],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              iconColor: Colors.white,
+              titleColor: Colors.white,
+              showDivider: false,
+              verticalPadding: 10,
               actions: [
                 _RoundIconButton(
                   icon: _isFavorite ? Icons.favorite : Icons.favorite_border,
                   color: _isFavorite ? Colors.redAccent : AppColors.gray600,
-                  onTap: () {
-                    setState(() {
-                      _isFavorite = !_isFavorite;
-                    });
+                  onTap: () async {
+                    try {
+                      final next = await widget.onToggleFavorite(book);
+                      if (!mounted) return;
+                      setState(() {
+                        _isFavorite = next;
+                      });
+                    } catch (error) {
+                      showTopMessage(
+                        context,
+                        message: error.toString(),
+                        type: TopMessageType.error,
+                      );
+                    }
                   },
                 ),
                 const SizedBox(width: 10),
@@ -319,7 +362,7 @@ class _BookDetailPageState extends State<BookDetailPage> {
                               Text(
                                 totalStock > 0
                                     ? 'Đã bán ${book.soldQuantity}/$totalStock'
-                                    : 'Chưa có số liệu bán',
+                                    : 'Chưa có dữ liệu bán',
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodySmall
@@ -443,14 +486,18 @@ class _BookDetailPageState extends State<BookDetailPage> {
       ),
       bottomNavigationBar: _AddToCartBar(
         onAddToCart: _handleAddToCart,
-        onBuyNow: _handleAddToCart,
+        onBuyNow: _handleBuyNow,
       ),
     );
   }
 }
 
 class _TabButton extends StatelessWidget {
-  const _TabButton({required this.label, required this.isActive, required this.onTap});
+  const _TabButton({
+    required this.label,
+    required this.isActive,
+    required this.onTap,
+  });
 
   final String label;
   final bool isActive;
@@ -483,7 +530,11 @@ class _TabButton extends StatelessWidget {
 }
 
 class _RoundIconButton extends StatelessWidget {
-  const _RoundIconButton({required this.icon, required this.color, this.onTap});
+  const _RoundIconButton({
+    required this.icon,
+    required this.color,
+    this.onTap,
+  });
 
   final IconData icon;
   final Color color;
@@ -495,13 +546,13 @@ class _RoundIconButton extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
       child: Container(
-        width: 40,
-        height: 40,
+        width: 34,
+        height: 34,
         decoration: BoxDecoration(
           color: AppColors.gray100,
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(17),
         ),
-        child: Icon(icon, color: color, size: 20),
+        child: Icon(icon, color: color, size: 18),
       ),
     );
   }
@@ -525,7 +576,10 @@ class _DetailsList extends StatelessWidget {
     final details = [
       _DetailRow(label: 'Nhà xuất bản', value: publisher ?? '-'),
       _DetailRow(label: 'Năm', value: year?.toString() ?? '-'),
-      _DetailRow(label: 'Số trang', value: pages != null ? '$pages trang' : '-'),
+      _DetailRow(
+        label: 'Số trang',
+        value: pages != null ? '$pages trang' : '-',
+      ),
       _DetailRow(label: 'Ngôn ngữ', value: language ?? '-'),
     ];
     return Column(children: details);
