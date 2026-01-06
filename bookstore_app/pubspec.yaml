@@ -44,6 +44,7 @@ dependencies:
   geolocator: ^11.0.0
   geocoding: ^3.0.0
   url_launcher: ^6.2.5
+  image_picker: ^1.1.2
 
 dev_dependencies:
   flutter_test:
@@ -103,5 +104,4 @@ flutter_launcher_icons:
   android: true
   ios: true
   image_path: assets/kbook_logo.png
-
 

@@ -23,8 +23,8 @@ class BottomNav extends StatelessWidget {
         label: 'Giỏ hàng',
         icon: Icons.shopping_cart_outlined,
       ),
-      _NavItem(id: 'contact', label: 'Liên hệ', icon: Icons.support_agent),
-      _NavItem(id: 'profile', label: 'Tôi', icon: Icons.person_outline),
+      _NavItem(id: 'contact', label: 'Liên hệ', icon: Icons.phone_in_talk),
+      _NavItem(id: 'profile', label: 'Hồ sơ', icon: Icons.person_outline),
     ];
 
     return Container(

@@ -1,45 +1,119 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:convert';
+import 'dart:io';
 
+import 'package:flutter/material.dart';
+import 'package:characters/characters.dart';
+
+import '../models/profile_service.dart';
+import '../models/profile_summary.dart';
+import 'edit_profile_page.dart';
+import 'order_list_page.dart';
 import '../widgets/app_colors.dart';
-import '../widgets/header.dart';
 
-class ProfilePage extends StatelessWidget {
-  const ProfilePage({super.key, required this.onLogout});
+class ProfilePage extends StatefulWidget {
+  const ProfilePage({super.key, required this.onLogout, required this.userId});
 
   final VoidCallback onLogout;
+  final int userId;
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  late final ProfileService _profileService =
+      ProfileService(baseUrl: _resolveBaseUrl());
+  ProfileSummary? _summary;
+  bool _loading = false;
+  String? _error;
+
+  static String _resolveBaseUrl() {
+    const overrideUrl = String.fromEnvironment('API_BASE_URL');
+    if (overrideUrl.isNotEmpty) {
+      return overrideUrl;
+    }
+    if (Platform.isAndroid) {
+      return 'http://192.168.1.4:8080';
+    }
+    return 'http://localhost:8080';
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSummary();
+  }
+
+  Future<void> _loadSummary() async {
+    if (widget.userId <= 0) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final summary = await _profileService.fetchProfileSummary(widget.userId);
+      if (!mounted) return;
+      setState(() {
+        _summary = summary;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.toString();
+      });
+    } finally {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+      });
+    }
+  }
+
+  String _formatCompactAmount(double value) {
+    if (value >= 1000000) {
+      final display = value / 1000000;
+      final digits = display >= 10 || display % 1 == 0 ? 0 : 1;
+      return '${display.toStringAsFixed(digits)}tr';
+    }
+    if (value >= 1000) {
+      final display = value / 1000;
+      final digits = display >= 10 || display % 1 == 0 ? 0 : 1;
+      return '${display.toStringAsFixed(digits)}k';
+    }
+    return value.toStringAsFixed(0);
+  }
+
+  String _resolveRankLabel(double totalSpend) {
+    if (totalSpend >= 5000000) return 'Kim cương';
+    if (totalSpend >= 2000000) return 'Vàng';
+    if (totalSpend >= 500000) return 'Bạc';
+    return 'Đồng';
+  }
+
+  Color _resolveRankColor(String label) {
+    switch (label) {
+      case 'Kim cương':
+        return AppColors.teal600;
+      case 'Bạc':
+        return AppColors.gray400;
+      case 'Đồng':
+        return AppColors.bronze;
+      default:
+        return AppColors.gold;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final menuItems = [
-      _ProfileMenuItem(
-        icon: Icons.shopping_bag_outlined,
-        label: 'Đơn hàng',
-        description: 'Xem tất cả đơn',
-        color: const Color(0xFFDBEAFE),
-        iconColor: const Color(0xFF2563EB),
-      ),
-      _ProfileMenuItem(
-        icon: Icons.favorite_border,
-        label: 'Yêu thích',
-        description: 'Sách đã lưu',
-        color: const Color(0xFFFEE2E2),
-        iconColor: const Color(0xFFDC2626),
-      ),
-      _ProfileMenuItem(
-        icon: Icons.location_on_outlined,
-        label: 'Địa chỉ',
-        description: 'Địa chỉ đã lưu',
-        color: const Color(0xFFDCFCE7),
-        iconColor: const Color(0xFF16A34A),
-      ),
-      _ProfileMenuItem(
-        icon: Icons.credit_card_outlined,
-        label: 'Thanh toán',
-        description: 'Quản lý thẻ',
-        color: const Color(0xFFEDE9FE),
-        iconColor: const Color(0xFF7C3AED),
-      ),
-    ];
+    final summary = _summary;
+    final displayName =
+        summary?.fullName.isNotEmpty == true ? summary!.fullName : 'Khách hàng';
+    final displayEmail =
+        summary?.email.isNotEmpty == true ? summary!.email : 'Chưa có email';
+    final orderCount = summary?.orderCount ?? 0;
+    final monthlySpend = (summary?.monthlySpend ?? 0.0).toStringAsFixed(0);
+    final rankLabel = _resolveRankLabel(summary?.totalSpend ?? 0.0);
+    final rankColor = _resolveRankColor(rankLabel);
 
     final settingsItems = [
       'Thông báo',
@@ -49,7 +123,6 @@ class ProfilePage extends StatelessWidget {
 
     return Column(
       children: [
-        const HeaderBar(title: 'Hồ sơ'),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.only(bottom: 24),
@@ -62,7 +135,7 @@ class ProfilePage extends StatelessWidget {
                     end: Alignment.bottomRight,
                   ),
                 ),
-                padding: const EdgeInsets.fromLTRB(20, 24, 20, 24),
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -71,32 +144,50 @@ class ProfilePage extends StatelessWidget {
                         Stack(
                           children: [
                             Container(
-                              width: 72,
-                              height: 72,
+                              width: 60,
+                              height: 60,
                               decoration: const BoxDecoration(
                                 color: Colors.white,
                                 shape: BoxShape.circle,
                               ),
-                              child: const Icon(
-                                Icons.person,
-                                size: 40,
-                                color: AppColors.orange600,
+                              child: _AvatarCircle(
+                                avatarUrl: summary?.avatar ?? '',
+                                fullName: displayName,
                               ),
                             ),
                             Positioned(
                               right: 0,
                               bottom: 0,
-                              child: Container(
-                                width: 24,
-                                height: 24,
-                                decoration: const BoxDecoration(
-                                  color: Colors.white,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.edit,
-                                  size: 14,
-                                  color: AppColors.orange600,
+                              child: InkWell(
+                                onTap: summary == null
+                                    ? null
+                                    : () async {
+                                        final updated =
+                                            await Navigator.push<bool>(
+                                          context,
+                                          MaterialPageRoute<bool>(
+                                            builder: (_) => EditProfilePage(
+                                              userId: widget.userId,
+                                              profile: summary,
+                                            ),
+                                          ),
+                                        );
+                                        if (updated == true) {
+                                          _loadSummary();
+                                        }
+                                      },
+                                child: Container(
+                                  width: 20,
+                                  height: 20,
+                                  decoration: const BoxDecoration(
+                                    color: Colors.white,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.edit,
+                                    size: 12,
+                                    color: AppColors.orange600,
+                                  ),
                                 ),
                               ),
                             ),
@@ -108,38 +199,42 @@ class ProfilePage extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                'Nguyễn Văn A',
+                                displayName,
                                 style: Theme.of(context)
                                     .textTheme
                                     .titleLarge
                                     ?.copyWith(
                                       color: Colors.white,
                                       fontWeight: FontWeight.w700,
+                                      fontSize: 18,
                                     ),
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                'nguyenvana@email.com',
+                                displayEmail,
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodyMedium
-                                    ?.copyWith(color: Colors.white70),
+                                    ?.copyWith(
+                                      color: Colors.white70,
+                                      fontSize: 13,
+                                    ),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 6),
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 4,
+                                  horizontal: 10,
+                                  vertical: 3,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
+                                  color: rankColor,
                                   borderRadius: BorderRadius.circular(20),
                                 ),
-                                child: const Text(
-                                'Thành viên Vàng',
-                                  style: TextStyle(
+                                child: Text(
+                                  rankLabel,
+                                  style: const TextStyle(
                                     color: Colors.white,
-                                    fontSize: 12,
+                                    fontSize: 11,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -149,15 +244,36 @@ class ProfilePage extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 14),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: const [
-                        _ProfileStat(value: '24', label: 'Đơn hàng'),
-                        _ProfileStat(value: '156', label: 'Sách'),
-                        _ProfileStat(value: '12', label: 'Yêu thích'),
+                      children: [
+                        Expanded(
+                          child: _ProfileStat(
+                            value: orderCount.toString(),
+                            label: 'Đơn hàng đã mua',
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _ProfileStat(
+                            value: '$monthlySpend VND',
+                            label: 'Mua tháng',
+                          ),
+                        ),
                       ],
                     ),
+                    if (_loading || _error != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        _loading
+                            ? 'Đang tải thông tin...'
+                            : 'Không tải được hồ sơ',
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelSmall
+                            ?.copyWith(color: Colors.white70),
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -165,21 +281,137 @@ class ProfilePage extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Container(
+                  padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(20),
+                    borderRadius: BorderRadius.circular(18),
                     boxShadow: [
                       BoxShadow(
                         color: Colors.black.withOpacity(0.04),
-                        blurRadius: 12,
+                        blurRadius: 10,
                         offset: const Offset(0, 6),
                       ),
                     ],
                   ),
                   child: Column(
-                    children: menuItems
-                        .map((item) => _ProfileMenuTile(item: item))
-                        .toList(),
+                    children: [
+                      InkWell(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute<void>(
+                              builder: (_) => OrderListPage(
+                                userId: widget.userId,
+                                initialTabIndex: 0,
+                              ),
+                            ),
+                          );
+                        },
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 2),
+                          child: Row(
+                            children: [
+                              Text(
+                                'Đơn mua',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleSmall
+                                    ?.copyWith(fontWeight: FontWeight.w600),
+                              ),
+                              const Spacer(),
+                              Text(
+                                'Xem lịch sử mua hàng',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(
+                                      color: AppColors.gray600,
+                                      fontWeight: FontWeight.w400,
+                                      fontSize: 10,
+                                    ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Icon(
+                                Icons.chevron_right,
+                                size: 18,
+                                color: AppColors.gray600,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          _OrderStatusItem(
+                            icon: Icons.assignment_outlined,
+                            label: 'Chờ xác nhận',
+                            badgeCount: summary?.pendingCount ?? 0,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute<void>(
+                                  builder: (_) => OrderListPage(
+                                    userId: widget.userId,
+                                    initialTabIndex: 0,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          _OrderStatusItem(
+                            icon: Icons.inventory_2_outlined,
+                            label: 'Chờ lấy hàng',
+                            badgeCount: summary?.waitingPickupCount ?? 0,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute<void>(
+                                  builder: (_) => OrderListPage(
+                                    userId: widget.userId,
+                                    initialTabIndex: 1,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          _OrderStatusItem(
+                            icon: Icons.local_shipping_outlined,
+                            label: 'Chờ giao hàng',
+                            badgeCount: summary?.shippingCount ?? 0,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute<void>(
+                                  builder: (_) => OrderListPage(
+                                    userId: widget.userId,
+                                    initialTabIndex: 2,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                          _OrderStatusItem(
+                            icon: Icons.star_border,
+                            label: 'Đánh giá',
+                            badgeCount: summary?.deliveredCount ?? 0,
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute<void>(
+                                  builder: (_) => OrderListPage(
+                                    userId: widget.userId,
+                                    initialTabIndex: 3,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -220,7 +452,7 @@ class ProfilePage extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: OutlinedButton.icon(
-                  onPressed: onLogout,
+                  onPressed: widget.onLogout,
                   icon: const Icon(Icons.logout),
                   label: const Text('Đăng xuất'),
                   style: OutlinedButton.styleFrom(
@@ -247,8 +479,8 @@ class _ProfileStat extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 90,
-      padding: const EdgeInsets.symmetric(vertical: 12),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 10),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.15),
         borderRadius: BorderRadius.circular(16),
@@ -257,9 +489,10 @@ class _ProfileStat extends StatelessWidget {
         children: [
           Text(
             value,
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
+                  fontSize: 16,
                 ),
           ),
           const SizedBox(height: 4),
@@ -267,6 +500,7 @@ class _ProfileStat extends StatelessWidget {
             label,
             style: Theme.of(context).textTheme.labelSmall?.copyWith(
                   color: Colors.white70,
+                  fontSize: 10,
                 ),
           ),
         ],
@@ -275,70 +509,137 @@ class _ProfileStat extends StatelessWidget {
   }
 }
 
-class _ProfileMenuItem {
-  const _ProfileMenuItem({
+class _OrderStatusItem extends StatelessWidget {
+  const _OrderStatusItem({
     required this.icon,
     required this.label,
-    required this.description,
-    required this.color,
-    required this.iconColor,
+    this.badgeCount,
+    this.onTap,
   });
 
   final IconData icon;
   final String label;
-  final String description;
-  final Color color;
-  final Color iconColor;
-}
-
-class _ProfileMenuTile extends StatelessWidget {
-  const _ProfileMenuTile({required this.item});
-
-  final _ProfileMenuItem item;
+  final int? badgeCount;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () {},
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: 72,
+        child: Column(
           children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: item.color,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(item.icon, color: item.iconColor),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.label,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodyMedium
-                        ?.copyWith(fontWeight: FontWeight.w600),
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                Icon(icon, color: AppColors.gray700, size: 22),
+                if (badgeCount != null && badgeCount! > 0)
+                  Positioned(
+                    right: -6,
+                    top: -6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 3,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.orange600,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        badgeCount!.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    item.description,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: AppColors.gray600),
-                  ),
-                ],
-              ),
+              ],
             ),
-            const Icon(Icons.chevron_right, color: AppColors.gray600),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    fontSize: 10,
+                    color: AppColors.gray700,
+                  ),
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _AvatarCircle extends StatelessWidget {
+  const _AvatarCircle({
+    required this.avatarUrl,
+    required this.fullName,
+  });
+
+  final String avatarUrl;
+  final String fullName;
+
+  String _initials() {
+    final trimmed = fullName.trim();
+    if (trimmed.isEmpty) return '?';
+    return trimmed.characters.first.toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final trimmed = avatarUrl.trim();
+    if (trimmed.startsWith('data:image')) {
+      final base64Part = trimmed.split(',').last;
+      try {
+        final bytes = base64Decode(base64Part);
+        return ClipOval(
+          child: Image.memory(
+            bytes,
+            width: 60,
+            height: 60,
+            fit: BoxFit.cover,
+          ),
+        );
+      } catch (_) {
+        return _AvatarFallback(initial: _initials());
+      }
+    }
+    if (trimmed.isNotEmpty) {
+      return ClipOval(
+        child: Image.network(
+          trimmed,
+          width: 60,
+          height: 60,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _AvatarFallback(initial: _initials()),
+        ),
+      );
+    }
+    return _AvatarFallback(initial: _initials());
+  }
+}
+
+class _AvatarFallback extends StatelessWidget {
+  const _AvatarFallback({required this.initial});
+
+  final String initial;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: Alignment.center,
+      child: Text(
+        initial,
+        style: Theme.of(context).textTheme.titleLarge?.copyWith(
+              color: AppColors.orange600,
+              fontWeight: FontWeight.w700,
+            ),
       ),
     );
   }
@@ -369,4 +670,10 @@ class _SettingsTile extends StatelessWidget {
     );
   }
 }
+
+
+
+
+
+
 

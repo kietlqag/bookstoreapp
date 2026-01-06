@@ -4,6 +4,7 @@ async function createOrderWithItems({
   userId,
   serviceId,
   paymentId,
+  recipientName,
   shippingAddressNew,
   shippingAddressOld,
   phoneNumber,
@@ -11,6 +12,10 @@ async function createOrderWithItems({
   status,
   items,
   totalPrice,
+  subtotal,
+  shippingFee,
+  productDiscount,
+  shippingDiscount,
   cartItemIds,
   shippingVoucherId,
   productVoucherId,
@@ -20,19 +25,26 @@ async function createOrderWithItems({
     await client.query('BEGIN');
     const orderResult = await client.query(
       'INSERT INTO "Order" ("userId", "serviceId", "paymentId", '
-        + '"shippingAddressNew", "shippingAddressOld", '
-        + '"phoneNumber", note, "totalPrice", status) '
-        + 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *',
+        + '"recipientName", "shippingAddressNew", "shippingAddressOld", '
+        + '"phoneNumber", note, "totalPrice", status, '
+        + 'subtotal, "shippingFee", "productDiscount", "shippingDiscount") '
+        + 'VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) '
+        + 'RETURNING *',
       [
         userId,
         serviceId,
         paymentId,
+        recipientName,
         shippingAddressNew,
         shippingAddressOld,
         phoneNumber,
         note,
         totalPrice,
         status || 'pending_confirmation',
+        subtotal || 0,
+        shippingFee || 0,
+        productDiscount || 0,
+        shippingDiscount || 0,
       ],
     );
 
@@ -106,7 +118,11 @@ async function findByUserId(userId) {
 
   const orderIds = orders.map((order) => order.id);
   const itemsResult = await pool.query(
-    'SELECT * FROM "OrderItem" WHERE "orderId" = ANY($1::int[])',
+    'SELECT oi.*, b.title AS "bookTitle", b."imageUrl" AS "bookImageUrl", '
+      + 'b.price AS "bookPrice", b.discount AS "bookDiscount" '
+      + 'FROM "OrderItem" oi '
+      + 'LEFT JOIN "Book" b ON b.id = oi."bookId" '
+      + 'WHERE oi."orderId" = ANY($1::int[])',
     [orderIds],
   );
 
@@ -123,7 +139,42 @@ async function findByUserId(userId) {
   }));
 }
 
+async function updateOrderAddress({
+  orderId,
+  userId,
+  shippingAddressNew,
+  shippingAddressOld,
+  recipientName,
+  phoneNumber,
+}) {
+  const result = await pool.query(
+    'UPDATE "Order" SET "shippingAddressNew" = $1, "shippingAddressOld" = $2, '
+      + '"recipientName" = $3, "phoneNumber" = $4 '
+      + 'WHERE id = $5 AND "userId" = $6 '
+      + 'RETURNING *',
+    [
+      shippingAddressNew,
+      shippingAddressOld,
+      recipientName,
+      phoneNumber,
+      orderId,
+      userId,
+    ],
+  );
+  return result.rows[0] || null;
+}
+
+async function updateOrderStatus({ orderId, userId, status }) {
+  const result = await pool.query(
+    'UPDATE "Order" SET status = $1 WHERE id = $2 AND "userId" = $3 RETURNING *',
+    [status, orderId, userId],
+  );
+  return result.rows[0] || null;
+}
+
 module.exports = {
   createOrderWithItems,
   findByUserId,
+  updateOrderAddress,
+  updateOrderStatus,
 };

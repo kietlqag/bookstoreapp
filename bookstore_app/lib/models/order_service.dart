@@ -87,6 +87,85 @@ class OrderService {
       client.close(force: true);
     }
   }
+
+  Future<void> updateOrderAddress({
+    required int orderId,
+    required int userId,
+    String? shippingAddressNew,
+    String? shippingAddressOld,
+    String? recipientName,
+    String? phoneNumber,
+  }) async {
+    final client = HttpClient();
+    try {
+      final uri = Uri.parse('$baseUrl/api/orders/$orderId/address');
+      final request = await client.patchUrl(uri);
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode({
+        'userId': userId,
+        'shippingAddressNew': shippingAddressNew,
+        'shippingAddressOld': shippingAddressOld,
+        'recipientName': recipientName,
+        'phoneNumber': phoneNumber,
+      }));
+      final response = await request.close();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw OrderServiceException('Request failed.');
+      }
+    } on SocketException {
+      throw OrderServiceException('Cannot connect to server.');
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  Future<void> cancelOrder({
+    required int orderId,
+    required int userId,
+  }) async {
+    final client = HttpClient();
+    try {
+      final uri = Uri.parse('$baseUrl/api/orders/$orderId/status');
+      final request = await client.patchUrl(uri);
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode({
+        'userId': userId,
+        'status': 'cancelled',
+      }));
+      final response = await request.close();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw OrderServiceException('Request failed.');
+      }
+    } on SocketException {
+      throw OrderServiceException('Cannot connect to server.');
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  Future<void> markOrderDelivered({
+    required int orderId,
+    required int userId,
+  }) async {
+    final client = HttpClient();
+    try {
+      final uri = Uri.parse('$baseUrl/api/orders/$orderId/status');
+      final request = await client.patchUrl(uri);
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode({
+        'userId': userId,
+        'status': 'delivered',
+      }));
+      final response = await request.close();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw OrderServiceException('Request failed.');
+      }
+    } on SocketException {
+      throw OrderServiceException('Cannot connect to server.');
+    } finally {
+      client.close(force: true);
+    }
+  }
 }
 
 class OrderServiceException implements Exception {

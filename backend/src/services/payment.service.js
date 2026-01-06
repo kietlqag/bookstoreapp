@@ -17,6 +17,7 @@ function postJson(url, payload) {
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(data),
       },
+      timeout: 15000,
     };
 
     const req = https.request(options, (res) => {
@@ -29,12 +30,19 @@ function postJson(url, payload) {
           const parsedBody = JSON.parse(body || '{}');
           resolve({ status: res.statusCode, data: parsedBody });
         } catch (error) {
+          console.error('MoMo response parse error:', error);
           reject(error);
         }
       });
     });
 
-    req.on('error', reject);
+    req.on('timeout', () => {
+      req.destroy(new Error('Request timeout'));
+    });
+    req.on('error', (error) => {
+      console.error('MoMo request error:', error);
+      reject(error);
+    });
     req.write(data);
     req.end();
   });
@@ -73,13 +81,18 @@ async function initiatePayment({
 
 
   if (method.provider === 'momo') {
-    const partnerCode = process.env.MOMO_PARTNER_CODE;
-    const accessKey = process.env.MOMO_ACCESS_KEY;
-    const secretKey = process.env.MOMO_SECRET_KEY;
-    const momoEndpoint = process.env.MOMO_ENDPOINT
+    console.log('MoMo initiate start');
+    const partnerCode = (process.env.MOMO_PARTNER_CODE || '').trim();
+    const accessKey = (process.env.MOMO_ACCESS_KEY || '').trim();
+    const secretKey = (process.env.MOMO_SECRET_KEY || '').trim();
+    const momoEndpoint = (process.env.MOMO_ENDPOINT || '').trim()
       || 'https://test-payment.momo.vn/v2/gateway/api/create';
-    const momoReturnUrl = returnUrl || process.env.MOMO_RETURN_URL;
-    const momoNotifyUrl = process.env.MOMO_NOTIFY_URL;
+    const momoReturnUrl =
+      (returnUrl || process.env.MOMO_RETURN_URL || '').trim();
+    const momoNotifyUrl = (process.env.MOMO_NOTIFY_URL || '').trim();
+    const momoRequestType = process.env.MOMO_REQUEST_TYPE || 'captureWallet';
+    const momoExtraData = process.env.MOMO_EXTRA_DATA || '';
+    const momoLang = process.env.MOMO_LANG || 'en';
 
     if (!partnerCode || !accessKey || !secretKey || !momoReturnUrl || !momoNotifyUrl) {
       throw new Error('MoMo config is missing.');
@@ -88,12 +101,11 @@ async function initiatePayment({
     const requestId = txnRef;
     const orderIdValue = txnRef;
     const amountValue = Math.round(amount).toString();
-    const requestType = 'captureWallet';
     const rawSignature =
-      `accessKey=${accessKey}&amount=${amountValue}&extraData=&ipnUrl=${momoNotifyUrl}`
+      `accessKey=${accessKey}&amount=${amountValue}&extraData=${momoExtraData}&ipnUrl=${momoNotifyUrl}`
       + `&orderId=${orderIdValue}&orderInfo=Thanh toan don hang ${txnRef}`
       + `&partnerCode=${partnerCode}&redirectUrl=${momoReturnUrl}`
-      + `&requestId=${requestId}&requestType=${requestType}`;
+      + `&requestId=${requestId}&requestType=${momoRequestType}`;
     const signature = crypto
       .createHmac('sha256', secretKey)
       .update(rawSignature)
@@ -101,21 +113,36 @@ async function initiatePayment({
 
     const body = {
       partnerCode,
+      accessKey,
       requestId,
       amount: amountValue,
       orderId: orderIdValue,
       orderInfo: `Thanh toan don hang ${txnRef}`,
       redirectUrl: momoReturnUrl,
       ipnUrl: momoNotifyUrl,
-      requestType,
-      extraData: '',
+      requestType: momoRequestType,
+      extraData: momoExtraData,
       signature,
-      lang: 'vi',
+      lang: momoLang,
     };
 
+    console.log('MoMo request payload:', {
+      partnerCode,
+      requestId,
+      amount: amountValue,
+      orderId: orderIdValue,
+      redirectUrl: momoReturnUrl,
+      ipnUrl: momoNotifyUrl,
+      requestType: momoRequestType,
+    });
     const response = await postJson(momoEndpoint, body);
+    console.log('MoMo response:', response);
     if (!response.data || !response.data.payUrl) {
-      throw new Error('MoMo create payment failed.');
+      const resultCode = response.data?.resultCode ?? 'unknown';
+      const message = response.data?.message ?? 'no message';
+      throw new Error(
+        `MoMo create payment failed. resultCode=${resultCode} message=${message}`,
+      );
     }
     const transaction = await paymentTransactionRepository.updateTransaction(
       baseTransaction.id,
@@ -126,7 +153,11 @@ async function initiatePayment({
     );
     return {
       transaction,
+      txnRef: baseTransaction.txnRef,
       paymentUrl: response.data.payUrl,
+      deeplink: response.data.deeplink,
+      qrCodeUrl: response.data.qrCodeUrl,
+      deeplinkMiniApp: response.data.deeplinkMiniApp,
     };
   }
 
@@ -169,11 +200,17 @@ async function initiatePayment({
         userId: Number(orderPayload.userId),
         serviceId: orderPayload.serviceId ? Number(orderPayload.serviceId) : null,
         paymentId: transaction.id,
+        recipientName: orderPayload.recipientName || null,
         shippingAddressNew: orderPayload.shippingAddressNew || null,
         shippingAddressOld: orderPayload.shippingAddressOld || null,
         phoneNumber: orderPayload.phoneNumber || null,
         note: orderPayload.note || null,
         status: 'pending_confirmation',
+        subtotal: orderPayload.subtotal,
+        shippingFee: orderPayload.shippingFee,
+        productDiscount: orderPayload.productDiscount,
+        shippingDiscount: orderPayload.shippingDiscount,
+        totalPrice: orderPayload.totalPrice,
         cartItemIds: orderPayload.cartItemIds || [],
         shippingVoucherId: orderPayload.shippingVoucherId || null,
         productVoucherId: orderPayload.productVoucherId || null,
@@ -205,18 +242,24 @@ async function handleMomoWebhook(payload) {
   if (!secretKey) {
     throw new Error('MoMo config is missing.');
   }
+  const pick = (value) => (value === undefined || value === null ? '' : value);
   const rawSignature =
-    `accessKey=${payload.accessKey}&amount=${payload.amount}&extraData=${payload.extraData}`
-    + `&message=${payload.message}&orderId=${payload.orderId}&orderInfo=${payload.orderInfo}`
-    + `&orderType=${payload.orderType}&partnerCode=${payload.partnerCode}`
-    + `&payType=${payload.payType}&requestId=${payload.requestId}`
-    + `&responseTime=${payload.responseTime}&resultCode=${payload.resultCode}`
-    + `&transId=${payload.transId}`;
+    `accessKey=${pick(payload.accessKey)}&amount=${pick(payload.amount)}&extraData=${pick(payload.extraData)}`
+    + `&message=${pick(payload.message)}&orderId=${pick(payload.orderId)}&orderInfo=${pick(payload.orderInfo)}`
+    + `&orderType=${pick(payload.orderType)}&partnerCode=${pick(payload.partnerCode)}`
+    + `&payType=${pick(payload.payType)}&requestId=${pick(payload.requestId)}`
+    + `&responseTime=${pick(payload.responseTime)}&resultCode=${pick(payload.resultCode)}`
+    + `&transId=${pick(payload.transId)}`;
   const signed = crypto
     .createHmac('sha256', secretKey)
     .update(rawSignature)
     .digest('hex');
   if (payload.signature !== signed) {
+    console.warn('MoMo webhook signature mismatch:', {
+      expected: signed,
+      received: payload.signature,
+      rawSignature,
+    });
     return { code: 97, message: 'Invalid signature' };
   }
   const success = Number(payload.resultCode) === 0;
@@ -259,11 +302,17 @@ async function handlePaidOrder(transaction) {
     userId: Number(payload.userId),
     serviceId: payload.serviceId ? Number(payload.serviceId) : null,
     paymentId: transaction.id,
+    recipientName: payload.recipientName || null,
     shippingAddressNew: payload.shippingAddressNew || null,
     shippingAddressOld: payload.shippingAddressOld || null,
     phoneNumber: payload.phoneNumber || null,
     note: payload.note || null,
     status: 'waiting_pickup',
+    subtotal: payload.subtotal,
+    shippingFee: payload.shippingFee,
+    productDiscount: payload.productDiscount,
+    shippingDiscount: payload.shippingDiscount,
+    totalPrice: payload.totalPrice,
     cartItemIds: payload.cartItemIds || [],
     shippingVoucherId: payload.shippingVoucherId || null,
     productVoucherId: payload.productVoucherId || null,
@@ -284,6 +333,7 @@ async function handlePaidOrder(transaction) {
 module.exports = {
   listPaymentMethods,
   initiatePayment,
+  getTransactionByRef: paymentTransactionRepository.findByTxnRef,
   handleMomoWebhook,
   handleVietqrWebhook,
 };

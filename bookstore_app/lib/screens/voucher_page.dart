@@ -91,9 +91,6 @@ class _VoucherPageState extends State<VoucherPage> {
         if (bestShipping != null) {
           _selectedShippingId = bestShipping.id;
         }
-        if (bestProduct != null && _selectedProductId == null) {
-          _selectedProductId = bestProduct.id;
-        }
         _loading = false;
       });
     } catch (error) {

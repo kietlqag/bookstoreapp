@@ -122,7 +122,10 @@ class _HomePageState extends State<HomePage> {
         userId: widget.userId,
       ),
       'contact': const ContactPage(),
-      'profile': ProfilePage(onLogout: widget.onLogout),
+      'profile': ProfilePage(
+        onLogout: widget.onLogout,
+        userId: widget.userId,
+      ),
     };
 
     return Scaffold(

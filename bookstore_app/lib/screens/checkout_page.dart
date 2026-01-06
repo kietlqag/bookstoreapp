@@ -374,22 +374,28 @@ class _CheckoutPageState extends State<CheckoutPage> {
         .map((item) => item.id)
         .where((id) => id > 0)
         .toList();
-    final orderPayload = {
-      'userId': widget.userId,
-      'serviceId': _selectedShipping?.id != null
-          ? int.tryParse(_selectedShipping!.id)
-          : null,
-      'shippingAddressNew': _selectedAddress!.addressLineNew,
-      'shippingAddressOld': _selectedAddress!.addressLine,
-      'phoneNumber': _selectedAddress!.phoneNumber,
-      'note': _noteController.text.trim().isEmpty
-          ? null
-          : _noteController.text.trim(),
-      'cartItemIds': cartItemIds,
-      'shippingVoucherId': _selectedShippingVoucher?.id,
-      'productVoucherId': _selectedProductVoucher?.id,
-      'items': itemsPayload,
-    };
+      final orderPayload = {
+        'userId': widget.userId,
+        'serviceId': _selectedShipping?.id != null
+            ? int.tryParse(_selectedShipping!.id)
+            : null,
+        'recipientName': _selectedAddress!.fullName,
+        'shippingAddressNew': _selectedAddress!.addressLineNew,
+        'shippingAddressOld': _selectedAddress!.addressLine,
+        'phoneNumber': _selectedAddress!.phoneNumber,
+        'note': _noteController.text.trim().isEmpty
+            ? null
+            : _noteController.text.trim(),
+        'subtotal': subtotal,
+        'shippingFee': shippingFee,
+        'productDiscount': discount,
+        'shippingDiscount': shippingDiscount,
+        'totalPrice': total,
+        'cartItemIds': cartItemIds,
+        'shippingVoucherId': _selectedShippingVoucher?.id,
+        'productVoucherId': _selectedProductVoucher?.id,
+        'items': itemsPayload,
+      };
 
     try {
       if (_selectedPaymentMethod!.provider == 'cod') {
@@ -437,15 +443,37 @@ class _CheckoutPageState extends State<CheckoutPage> {
         orderPayload: orderPayload,
       );
       if (!mounted) return;
-      if (response.paymentUrl != null && response.paymentUrl!.isNotEmpty) {
-        final uri = Uri.tryParse(response.paymentUrl!);
-        if (uri == null ||
-            !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if ((response.paymentUrl != null && response.paymentUrl!.isNotEmpty) ||
+          (response.qrCodeUrl != null && response.qrCodeUrl!.isNotEmpty) ||
+          (response.deeplink != null && response.deeplink!.isNotEmpty)) {
+        final url = response.paymentUrl?.isNotEmpty == true
+            ? response.paymentUrl!
+            : response.qrCodeUrl?.isNotEmpty == true
+                ? response.qrCodeUrl!
+                : response.deeplink!;
+        debugPrint('[Payment] payUrl: $url');
+        final opened = await _openPaymentUrl(url);
+        debugPrint('[Payment] launchUrl opened=$opened');
+        if (!opened) {
           showTopMessage(
             context,
             message:
                 'Kh\u00f4ng m\u1edf \u0111\u01b0\u1ee3c trang thanh to\u00e1n',
             type: TopMessageType.error,
+          );
+        }
+        if (response.provider == 'momo' &&
+            response.txnRef != null &&
+            response.txnRef!.isNotEmpty) {
+          await _showPaymentPendingSheet(
+            txnRef: response.txnRef!,
+            paymentUrl: url,
+            subtotal: subtotal,
+            shippingFee: shippingFee,
+            discount: discount,
+            shippingDiscount: shippingDiscount,
+            total: total,
+            cartItemIds: cartItemIds,
           );
         }
       } else if (response.qrImageUrl != null &&
@@ -479,6 +507,87 @@ class _CheckoutPageState extends State<CheckoutPage> {
       if (mounted) {
         setState(() => _processingPayment = false);
       }
+    }
+  }
+
+  Future<void> _showPaymentPendingSheet({
+    required String txnRef,
+    required String paymentUrl,
+    required double subtotal,
+    required double shippingFee,
+    required double discount,
+    required double shippingDiscount,
+    required double total,
+    required List<int> cartItemIds,
+  }) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (_) => _PaymentPendingSheet(
+        onOpenAgain: () async {
+          await _openPaymentUrl(paymentUrl);
+        },
+        onConfirm: () async {
+          try {
+            final status = await _paymentService.fetchPaymentStatus(txnRef);
+            if (!mounted) return;
+            if (status.status != 'succeeded' || status.orderId == null) {
+              showTopMessage(
+                context,
+                message: 'Ch\u01b0a nh\u1eadn \u0111\u01b0\u1ee3c thanh to\u00e1n',
+                type: TopMessageType.error,
+              );
+              return;
+            }
+            if (cartItemIds.isNotEmpty) {
+              widget.onOrderCompleted?.call(cartItemIds);
+            }
+            Navigator.of(context).pop();
+            if (!mounted) return;
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => OrderSuccessPage(
+                  userId: widget.userId,
+                  orderId: status.orderId,
+                  items: widget.items,
+                  subtotal: subtotal,
+                  shippingFee: shippingFee,
+                  productDiscount: discount,
+                  shippingDiscount: shippingDiscount,
+                  total: total,
+                  shippingAddressNew: _selectedAddress?.addressLineNew,
+                  shippingAddressOld: _selectedAddress?.addressLine,
+                  phoneNumber: _selectedAddress?.phoneNumber,
+                  paymentLabel: _selectedPaymentMethod?.title,
+                ),
+              ),
+            );
+          } catch (_) {
+            if (!mounted) return;
+            showTopMessage(
+              context,
+              message: 'Kh\u00f4ng ki\u1ec3m tra \u0111\u01b0\u1ee3c thanh to\u00e1n',
+              type: TopMessageType.error,
+            );
+          }
+        },
+      ),
+    );
+  }
+
+  Future<bool> _openPaymentUrl(String url) async {
+    final uri = Uri.tryParse(url);
+    if (uri == null) return false;
+    try {
+      final opened =
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+      return opened;
+    } catch (error) {
+      debugPrint('[Payment] launchUrl error: $error');
+      return false;
     }
   }
 
@@ -1412,6 +1521,78 @@ class _QrSheet extends StatelessWidget {
               ),
               child: const Text('T\u00f4i \u0111\u00e3 qu\u00e9t'),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PaymentPendingSheet extends StatelessWidget {
+  const _PaymentPendingSheet({
+    required this.onOpenAgain,
+    required this.onConfirm,
+  });
+
+  final Future<void> Function() onOpenAgain;
+  final Future<void> Function() onConfirm;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Ch\u1edd x\u00e1c nh\u1eadn thanh to\u00e1n',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Sau khi thanh to\u00e1n tr\u00ean web, nh\u1ea5n "\u0110\u00e3 thanh to\u00e1n" \u0111\u1ec3 ki\u1ec3m tra \u0111\u01a1n h\u00e0ng.',
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: AppColors.gray600),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () async => onOpenAgain(),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.orange600,
+                    side: const BorderSide(color: AppColors.orange600),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('M\u1edf l\u1ea1i'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () async => onConfirm(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.orange600,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('\u0110\u00e3 thanh to\u00e1n'),
+                ),
+              ),
+            ],
           ),
         ],
       ),

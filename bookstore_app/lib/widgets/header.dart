@@ -23,6 +23,7 @@ class HeaderBar extends StatelessWidget {
     this.horizontalPadding = 16,
     this.verticalPadding = 10,
     this.titlePadding = EdgeInsets.zero,
+    this.titleSize,
   });
 
   final String? title;
@@ -43,6 +44,7 @@ class HeaderBar extends StatelessWidget {
   final double horizontalPadding;
   final double verticalPadding;
   final EdgeInsets titlePadding;
+  final double? titleSize;
 
   @override
   Widget build(BuildContext context) {
@@ -80,6 +82,7 @@ class HeaderBar extends StatelessWidget {
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                         color: titleColor ?? AppColors.gray900,
+                        fontSize: titleSize,
                       ),
                 ),
               ),

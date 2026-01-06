@@ -219,6 +219,9 @@ class _InvoiceCard extends StatelessWidget {
           _InfoRow(label: 'M\u00e3 \u0111\u01a1n', value: orderId),
           _InfoRow(label: 'Ng\u00e0y', value: dateText),
           _InfoRow(label: 'S\u1ed1 \u0111i\u1ec7n tho\u1ea1i', value: phoneText),
+          _InfoRow(label: 'Thanh to\u00e1n', value: paymentText),
+          const Divider(height: 24, color: AppColors.gray200),
+          const SizedBox(height: 8),
           _InfoRow(
             label: '\u0110\u1ecba ch\u1ec9 m\u1edbi',
             value: shippingAddressNew?.trim().isNotEmpty == true
@@ -231,7 +234,6 @@ class _InvoiceCard extends StatelessWidget {
                 ? shippingAddressOld!
                 : 'Ch\u01b0a c\u00f3',
           ),
-          _InfoRow(label: 'Thanh to\u00e1n', value: paymentText),
           const Divider(height: 24, color: AppColors.gray200),
           const SizedBox(height: 4),
           ...items.map((item) => _ItemRow(item: item)),

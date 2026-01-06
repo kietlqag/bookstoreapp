@@ -5,7 +5,11 @@ class PaymentInitiateResponse {
   const PaymentInitiateResponse({
     required this.transactionId,
     required this.provider,
+    this.txnRef,
     this.paymentUrl,
+    this.deeplink,
+    this.qrCodeUrl,
+    this.deeplinkMiniApp,
     this.qrImageUrl,
     this.qrContent,
     this.orderId,
@@ -13,7 +17,11 @@ class PaymentInitiateResponse {
 
   final int transactionId;
   final String provider;
+  final String? txnRef;
   final String? paymentUrl;
+  final String? deeplink;
+  final String? qrCodeUrl;
+  final String? deeplinkMiniApp;
   final String? qrImageUrl;
   final String? qrContent;
   final int? orderId;
@@ -23,7 +31,12 @@ class PaymentInitiateResponse {
     return PaymentInitiateResponse(
       transactionId: transaction['id'] as int? ?? 0,
       provider: transaction['provider']?.toString() ?? '',
+      txnRef: json['txnRef']?.toString() ??
+          transaction['txnRef']?.toString(),
       paymentUrl: json['paymentUrl']?.toString(),
+      deeplink: json['deeplink']?.toString(),
+      qrCodeUrl: json['qrCodeUrl']?.toString(),
+      deeplinkMiniApp: json['deeplinkMiniApp']?.toString(),
       qrImageUrl: json['qrImageUrl']?.toString(),
       qrContent: json['qrContent']?.toString(),
       orderId: json['orderId'] as int?,
@@ -73,6 +86,35 @@ class PaymentService {
       client.close(force: true);
     }
   }
+
+  Future<PaymentStatus> fetchPaymentStatus(String txnRef) async {
+    final client = HttpClient();
+    try {
+      final uri = Uri.parse('$baseUrl/api/payments/transactions/$txnRef');
+      final request = await client.getUrl(uri);
+      request.headers.contentType = ContentType.json;
+
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw PaymentServiceException('Request failed.');
+      }
+      if (body.isEmpty) {
+        throw PaymentServiceException('Empty response.');
+      }
+      final data = jsonDecode(body);
+      if (data is! Map<String, dynamic>) {
+        throw PaymentServiceException('Invalid response format.');
+      }
+      return PaymentStatus.fromJson(data);
+    } on SocketException {
+      throw PaymentServiceException('Cannot connect to server.');
+    } on FormatException {
+      throw PaymentServiceException('Invalid response format.');
+    } finally {
+      client.close(force: true);
+    }
+  }
 }
 
 class PaymentServiceException implements Exception {
@@ -82,4 +124,21 @@ class PaymentServiceException implements Exception {
 
   @override
   String toString() => message;
+}
+
+class PaymentStatus {
+  const PaymentStatus({
+    required this.status,
+    required this.orderId,
+  });
+
+  final String status;
+  final int? orderId;
+
+  factory PaymentStatus.fromJson(Map<String, dynamic> json) {
+    return PaymentStatus(
+      status: json['status']?.toString() ?? '',
+      orderId: json['orderId'] as int?,
+    );
+  }
 }

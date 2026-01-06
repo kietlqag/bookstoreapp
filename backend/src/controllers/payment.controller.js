@@ -23,7 +23,10 @@ async function initiatePayment(req, res, next) {
     });
     res.json(result);
   } catch (error) {
-    next(error);
+    console.error('Payment initiate error:', error);
+    res.status(500).json({
+      message: error?.message || 'Payment initiate failed',
+    });
   }
 }
 
@@ -46,9 +49,29 @@ async function handleVietqrWebhook(req, res, next) {
   }
 }
 
+async function getTransaction(req, res, next) {
+  try {
+    const txnRef = req.params.txnRef?.toString();
+    if (!txnRef) {
+      return res.status(400).json({ message: 'Invalid transaction reference.' });
+    }
+    const transaction = await paymentService.getTransactionByRef(txnRef);
+    if (!transaction) {
+      return res.status(404).json({ message: 'Transaction not found.' });
+    }
+    return res.json({
+      status: transaction.status,
+      orderId: transaction.orderId || null,
+    });
+  } catch (error) {
+    return next(error);
+  }
+}
+
 module.exports = {
   listMethods,
   initiatePayment,
   handleMomoWebhook,
   handleVietqrWebhook,
+  getTransaction,
 };

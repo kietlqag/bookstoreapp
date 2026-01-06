@@ -5,6 +5,7 @@ const router = Router();
 
 router.get('/methods', paymentController.listMethods);
 router.post('/initiate', paymentController.initiatePayment);
+router.get('/transactions/:txnRef', paymentController.getTransaction);
 router.post('/webhook/momo', paymentController.handleMomoWebhook);
 router.post('/webhook/vietqr', paymentController.handleVietqrWebhook);
 
