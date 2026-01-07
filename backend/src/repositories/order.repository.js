@@ -119,7 +119,7 @@ async function findByUserId(userId) {
   const orderIds = orders.map((order) => order.id);
   const itemsResult = await pool.query(
     'SELECT oi.*, b.title AS "bookTitle", b."imageUrl" AS "bookImageUrl", '
-      + 'b.price AS "bookPrice", b.discount AS "bookDiscount" '
+      + 'b.price AS "bookPrice", b.discount AS "bookDiscount", b.author AS "bookAuthor" '
       + 'FROM "OrderItem" oi '
       + 'LEFT JOIN "Book" b ON b.id = oi."bookId" '
       + 'WHERE oi."orderId" = ANY($1::int[])',

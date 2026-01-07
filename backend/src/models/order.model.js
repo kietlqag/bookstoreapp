@@ -21,12 +21,15 @@
       id: item.id,
       bookId: item.bookId,
       bookTitle: item.bookTitle || '',
+      bookAuthor: item.bookAuthor || '',
+      reviewed: item.reviewed || false,
       quantity: item.quantity,
       price: item.price,
       bookImageUrl: item.bookImageUrl,
       bookPrice: item.bookPrice,
       bookDiscount: item.bookDiscount,
     })),
+    isReviewed: order.isReviewed || false,
   };
 }
 

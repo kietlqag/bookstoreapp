@@ -8,6 +8,7 @@ import '../models/profile_service.dart';
 import '../models/profile_summary.dart';
 import 'edit_profile_page.dart';
 import 'order_list_page.dart';
+import 'review_list_page.dart';
 import '../widgets/app_colors.dart';
 
 class ProfilePage extends StatefulWidget {
@@ -396,14 +397,14 @@ class _ProfilePageState extends State<ProfilePage> {
                           _OrderStatusItem(
                             icon: Icons.star_border,
                             label: 'Đánh giá',
-                            badgeCount: summary?.deliveredCount ?? 0,
+                            badgeCount: summary?.reviewPendingCount ?? 0,
                             onTap: () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute<void>(
-                                  builder: (_) => OrderListPage(
+                                  builder: (_) => ReviewListPage(
                                     userId: widget.userId,
-                                    initialTabIndex: 3,
+                                    initialIndex: 0,
                                   ),
                                 ),
                               );

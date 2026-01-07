@@ -13,6 +13,7 @@ class OrderSummary {
     required this.shippingDiscount,
     required this.orderDate,
     required this.items,
+    required this.isReviewed,
   });
 
   final int id;
@@ -28,6 +29,7 @@ class OrderSummary {
   final double shippingDiscount;
   final DateTime? orderDate;
   final List<OrderItemSummary> items;
+  final bool isReviewed;
 
   factory OrderSummary.fromJson(Map<String, dynamic> json) {
     return OrderSummary(
@@ -47,6 +49,7 @@ class OrderSummary {
           .whereType<Map<String, dynamic>>()
           .map(OrderItemSummary.fromJson)
           .toList(),
+      isReviewed: json['isReviewed'] == true,
     );
   }
 
@@ -68,6 +71,8 @@ class OrderItemSummary {
     required this.id,
     required this.bookId,
     required this.bookTitle,
+    required this.bookAuthor,
+    required this.reviewed,
     required this.quantity,
     required this.price,
     required this.bookImageUrl,
@@ -78,6 +83,8 @@ class OrderItemSummary {
   final int id;
   final int bookId;
   final String bookTitle;
+  final String bookAuthor;
+  final bool reviewed;
   final int quantity;
   final double price;
   final String bookImageUrl;
@@ -94,6 +101,8 @@ class OrderItemSummary {
       bookImageUrl: json['bookImageUrl']?.toString() ?? '',
       bookPrice: _parseDouble(json['bookPrice']),
       bookDiscount: _parseDouble(json['bookDiscount']),
+      bookAuthor: json['bookAuthor']?.toString() ?? '',
+      reviewed: json['reviewed'] == true,
     );
   }
 

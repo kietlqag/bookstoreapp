@@ -11,6 +11,7 @@ class ProfileSummary {
     required this.waitingPickupCount,
     required this.shippingCount,
     required this.deliveredCount,
+    required this.reviewPendingCount,
     required this.returningCount,
     required this.cancelledCount,
     required this.bookCount,
@@ -30,6 +31,7 @@ class ProfileSummary {
   final int waitingPickupCount;
   final int shippingCount;
   final int deliveredCount;
+  final int reviewPendingCount;
   final int returningCount;
   final int cancelledCount;
   final int bookCount;
@@ -52,6 +54,8 @@ class ProfileSummary {
       shippingCount: int.tryParse(json['shippingCount']?.toString() ?? '') ?? 0,
       deliveredCount:
           int.tryParse(json['deliveredCount']?.toString() ?? '') ?? 0,
+      reviewPendingCount:
+          int.tryParse(json['reviewPendingCount']?.toString() ?? '') ?? 0,
       returningCount:
           int.tryParse(json['returningCount']?.toString() ?? '') ?? 0,
       cancelledCount:

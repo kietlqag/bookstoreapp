@@ -6,9 +6,11 @@ import '../models/address.dart';
 import '../models/address_service.dart';
 import '../models/order.dart';
 import '../models/order_service.dart';
+import '../models/review_service.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/price_formatter.dart';
 import 'address_list_page.dart';
+import 'review_order_page.dart';
 
 class OrderDetailPage extends StatefulWidget {
   const OrderDetailPage({
@@ -40,6 +42,8 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
       AddressService(baseUrl: _resolveBaseUrl());
   late final OrderService _orderService =
       OrderService(baseUrl: _resolveBaseUrl());
+  late final ReviewService _reviewService =
+      ReviewService(baseUrl: _resolveBaseUrl());
 
   @override
   void initState() {
@@ -49,6 +53,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     _recipientName = widget.order.recipientName;
     _phoneNumber = widget.order.phoneNumber;
     _currentStatus = widget.order.status;
+    _reviewed = widget.order.isReviewed;
   }
 
   static String _resolveBaseUrl() {
@@ -182,6 +187,23 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     }
   }
 
+  Future<void> _openReviewPage() async {
+    final submitted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => ReviewOrderPage(
+          order: widget.order,
+          userId: widget.userId,
+          reviewService: _reviewService,
+        ),
+      ),
+    );
+    if (!mounted || submitted != true) return;
+    setState(() {
+      _reviewed = true;
+    });
+    _showMessage('Cảm ơn bạn đã đánh giá.');
+  }
+
   @override
   Widget build(BuildContext context) {
     final order = widget.order;
@@ -231,187 +253,203 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
           ),
         ),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      body: Column(
         children: [
-          _StatusBanner(statusText: statusText),
-          const SizedBox(height: 12),
-          _InfoCard(
-            title: 'Thông tin vận chuyển',
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
               children: [
-                _InfoRow(
-                  icon: Icons.local_shipping_outlined,
-                  title: status == 'delivered'
-                      ? 'Giao hàng thành công'
-                      : statusText,
-                  subtitle: dateText,
-                  accent: AppColors.teal600,
+                _StatusBanner(statusText: statusText),
+                const SizedBox(height: 12),
+                _InfoCard(
+                  title: 'Thông tin vận chuyển',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _InfoRow(
+                        icon: Icons.local_shipping_outlined,
+                        title: status == 'delivered'
+                            ? 'Giao hàng thành công'
+                            : statusText,
+                        subtitle: dateText,
+                        accent: AppColors.teal600,
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        'Đơn vị vận chuyển: Chưa cập nhật',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: AppColors.gray600),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 10),
-                Text(
-                  'Đơn vị vận chuyển: Chưa cập nhật',
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: AppColors.gray600),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          _InfoCard(
-            title: 'Thông tin nhận hàng',
-            trailing: status == 'pending_confirmation'
-                ? InkWell(
-                    onTap: _updatingAddress ? null : _handleChangeAddress,
-                    child: Text(
-                      _updatingAddress ? 'Đang cập nhật' : 'Thay đổi',
-                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                            color: AppColors.orange600,
-                            fontWeight: FontWeight.w600,
+                const SizedBox(height: 12),
+                _InfoCard(
+                  title: 'Thông tin nhận hàng',
+                  trailing: status == 'pending_confirmation'
+                      ? InkWell(
+                          onTap: _updatingAddress ? null : _handleChangeAddress,
+                          child: Text(
+                            _updatingAddress ? 'Đang cập nhật' : 'Thay đổi',
+                            style: Theme.of(context)
+                                .textTheme
+                                .labelSmall
+                                ?.copyWith(
+                                  color: AppColors.orange600,
+                                  fontWeight: FontWeight.w600,
+                                ),
                           ),
-                    ),
-                  )
-                : null,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Người nhận',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: AppColors.gray600,
-                        fontWeight: FontWeight.w700,
+                        )
+                      : null,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Người nhận',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: AppColors.gray600,
+                              fontWeight: FontWeight.w700,
+                            ),
                       ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  nameText,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: AppColors.gray700),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Số điện thoại',
-                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                        color: AppColors.gray600,
-                        fontWeight: FontWeight.w700,
+                      const SizedBox(height: 2),
+                      Text(
+                        nameText,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: AppColors.gray700),
                       ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  phoneText,
-                  style: Theme.of(context)
-                      .textTheme
-                      .bodySmall
-                      ?.copyWith(color: AppColors.gray700),
-                ),
-                const SizedBox(height: 8),
-                if (hasAddressNew) ...[
-                  Text(
-                    'Địa chỉ mới',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: AppColors.gray600,
-                          fontWeight: FontWeight.w700,
+                      const SizedBox(height: 8),
+                      Text(
+                        'Số điện thoại',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                              color: AppColors.gray600,
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        phoneText,
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: AppColors.gray700),
+                      ),
+                      const SizedBox(height: 8),
+                      if (hasAddressNew) ...[
+                        Text(
+                          'Địa chỉ mới',
+                          style:
+                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: AppColors.gray600,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                         ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    addressNew,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: AppColors.gray700),
-                  ),
-                ],
-                if (hasAddressNew && hasAddressOld)
-                  const SizedBox(height: 8),
-                if (hasAddressOld) ...[
-                  Text(
-                    'Địa chỉ cũ',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: AppColors.gray600,
-                          fontWeight: FontWeight.w700,
+                        const SizedBox(height: 2),
+                        Text(
+                          addressNew,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: AppColors.gray700),
                         ),
+                      ],
+                      if (hasAddressNew && hasAddressOld)
+                        const SizedBox(height: 8),
+                      if (hasAddressOld) ...[
+                        Text(
+                          'Địa chỉ cũ',
+                          style:
+                              Theme.of(context).textTheme.labelSmall?.copyWith(
+                                    color: AppColors.gray600,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          addressOld,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: AppColors.gray700),
+                        ),
+                      ],
+                      if (!hasAddressNew && !hasAddressOld)
+                        Text(
+                          'Chưa có địa chỉ giao hàng',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: AppColors.gray600),
+                        ),
+                    ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    addressOld,
+                ),
+                const SizedBox(height: 12),
+                _InfoCard(
+                  title: 'Sản phẩm',
+                  trailing: Text(
+                    'Mã đơn #${order.id}',
                     style: Theme.of(context)
                         .textTheme
-                        .bodySmall
-                        ?.copyWith(color: AppColors.gray700),
-                  ),
-                ],
-                if (!hasAddressNew && !hasAddressOld)
-                  Text(
-                    'Chưa có địa chỉ giao hàng',
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
+                        .labelSmall
                         ?.copyWith(color: AppColors.gray600),
                   ),
+                  child: Column(
+                    children: [
+                      ..._buildItems(context),
+                      const SizedBox(height: 2),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _InfoCard(
+                  title: 'Chi tiết thanh toán',
+                  child: Column(
+                    children: [
+                      _PriceRow(
+                        label: 'Tạm tính',
+                        value: formatPrice(order.subtotal),
+                      ),
+                      _PriceRow(
+                        label: 'Phí vận chuyển',
+                        value: formatPrice(order.shippingFee),
+                      ),
+                      _PriceRow(
+                        label: 'Giảm giá sản phẩm',
+                        value: order.productDiscount == 0
+                            ? formatPrice(0)
+                            : '-${formatPrice(order.productDiscount)}',
+                      ),
+                      _PriceRow(
+                        label: 'Giảm phí vận chuyển',
+                        value: order.shippingDiscount == 0
+                            ? formatPrice(0)
+                            : '-${formatPrice(order.shippingDiscount)}',
+                      ),
+                      const Divider(height: 16, color: AppColors.gray200),
+                      _PriceRow(
+                        label:
+                            'Tổng cộng (${totalQty > 0 ? totalQty : 1} sản phẩm)',
+                        value: formatPrice(order.totalPrice),
+                        isEmphasis: true,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          _InfoCard(
-            title: 'Sản phẩm',
-            trailing: Text(
-              'Mã đơn #${order.id}',
-              style: Theme.of(context)
-                  .textTheme
-                  .labelSmall
-                  ?.copyWith(color: AppColors.gray600),
-            ),
-            child: Column(
-              children: [
-                ..._buildItems(context),
-                const SizedBox(height: 2),
-              ],
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: _buildActions(status),
             ),
           ),
-          const SizedBox(height: 12),
-          _InfoCard(
-            title: 'Chi tiết thanh toán',
-            child: Column(
-              children: [
-                _PriceRow(
-                  label: 'Tạm tính',
-                  value: formatPrice(order.subtotal),
-                ),
-                _PriceRow(
-                  label: 'Phí vận chuyển',
-                  value: formatPrice(order.shippingFee),
-                ),
-                _PriceRow(
-                  label: 'Giảm giá sản phẩm',
-                  value: order.productDiscount == 0
-                      ? formatPrice(0)
-                      : '-${formatPrice(order.productDiscount)}',
-                ),
-                _PriceRow(
-                  label: 'Giảm phí vận chuyển',
-                  value: order.shippingDiscount == 0
-                      ? formatPrice(0)
-                      : '-${formatPrice(order.shippingDiscount)}',
-                ),
-                const Divider(height: 16, color: AppColors.gray200),
-                _PriceRow(
-                  label:
-                      'Tổng cộng (${totalQty > 0 ? totalQty : 1} sản phẩm)',
-                  value: formatPrice(order.totalPrice),
-                  isEmphasis: true,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          _buildActions(status),
-          const SizedBox(height: 24),
         ],
       ),
     );
@@ -505,49 +543,21 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     }
 
     if (status == 'delivered') {
-      return Row(
-        children: [
-          Expanded(
-            child: OutlinedButton(
-              onPressed: () {
-                _showMessage('Đã gửi yêu cầu hoàn tiền.');
-              },
-              style: OutlinedButton.styleFrom(
-                foregroundColor: AppColors.orange600,
-                side: const BorderSide(color: AppColors.orange600),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-              child: const Text('Hoàn tiền'),
+      return SizedBox(
+        width: double.infinity,
+        child: ElevatedButton(
+          onPressed:
+              _reviewed ? () => _showMessage('Mua lại sản phẩm.') : _openReviewPage,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.orange600,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
             ),
+            padding: const EdgeInsets.symmetric(vertical: 12),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: ElevatedButton(
-              onPressed: () {
-                if (!_reviewed) {
-                  setState(() {
-                    _reviewed = true;
-                  });
-                  _showMessage('Mở trang đánh giá.');
-                } else {
-                  _showMessage('Mua lại sản phẩm.');
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.orange600,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                padding: const EdgeInsets.symmetric(vertical: 12),
-              ),
-              child: Text(_reviewed ? 'Mua lại' : 'Đánh giá'),
-            ),
-          ),
-        ],
+          child: Text(_reviewed ? 'Mua lại' : 'Đánh giá'),
+        ),
       );
     }
 

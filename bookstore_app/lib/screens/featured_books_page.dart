@@ -62,15 +62,14 @@ class _FeaturedBooksPageState extends State<FeaturedBooksPage> {
 
   @override
   Widget build(BuildContext context) {
-    final featuredBooks = widget.books
-        .where((book) => book.rating >= 4.5)
-        .where((book) {
-          if (_query.isEmpty) return true;
-          final term = _normalize(_query);
-          return _normalize(book.title).contains(term) ||
-              _normalize(book.author).contains(term);
-        })
-        .toList();
+    final topRatedBooks = [...widget.books]
+      ..sort((a, b) => b.rating.compareTo(a.rating));
+    final featuredBooks = topRatedBooks.where((book) {
+      if (_query.isEmpty) return true;
+      final term = _normalize(_query);
+      return _normalize(book.title).contains(term) ||
+          _normalize(book.author).contains(term);
+    }).take(30).toList();
 
     return Scaffold(
       appBar: AppBar(

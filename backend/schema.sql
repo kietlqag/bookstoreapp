@@ -91,17 +91,6 @@ CREATE TABLE IF NOT EXISTS "Category" (
 );
 
 
-CREATE TABLE IF NOT EXISTS "Review" (
-  id SERIAL PRIMARY KEY,
-  "bookId" INTEGER NOT NULL,
-  "userName" TEXT,
-  rating NUMERIC(2,1) NOT NULL CHECK (rating >= 0 AND rating <= 5),
-  comment TEXT,
-  "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
-  CONSTRAINT fk_review_book
-    FOREIGN KEY ("bookId") REFERENCES "Book"(id) ON DELETE CASCADE
-);
-
 CREATE TABLE IF NOT EXISTS "Inventory" (
   id SERIAL PRIMARY KEY,
   "bookId" INTEGER NOT NULL UNIQUE,
@@ -222,6 +211,29 @@ CREATE TABLE IF NOT EXISTS "OrderItem" (
   price NUMERIC(12,2) NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS "Review" (
+  id SERIAL PRIMARY KEY,
+  "bookId" INTEGER NOT NULL,
+  "orderId" INTEGER NOT NULL,
+  "orderItemId" INTEGER NOT NULL,
+  "userId" INTEGER,
+  "userName" TEXT,
+  rating NUMERIC(2,1) NOT NULL CHECK (rating >= 0 AND rating <= 5),
+  comment TEXT,
+  anonymous BOOLEAN NOT NULL DEFAULT false,
+  images JSONB,
+  videos JSONB,
+  "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+  CONSTRAINT fk_review_book
+    FOREIGN KEY ("bookId") REFERENCES "Book"(id) ON DELETE CASCADE,
+  CONSTRAINT fk_review_order
+    FOREIGN KEY ("orderId") REFERENCES "Order"(id) ON DELETE CASCADE,
+  CONSTRAINT fk_review_order_item
+    FOREIGN KEY ("orderItemId") REFERENCES "OrderItem"(id) ON DELETE CASCADE,
+  CONSTRAINT fk_review_user
+    FOREIGN KEY ("userId") REFERENCES "User"(id) ON DELETE SET NULL
+);
+
 ALTER TABLE IF EXISTS "Order"
   ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'pending_confirmation';
 
@@ -248,6 +260,12 @@ ALTER TABLE IF EXISTS "Order"
 
 ALTER TABLE IF EXISTS "Order"
   ADD COLUMN IF NOT EXISTS "recipientName" TEXT;
+
+ALTER TABLE IF EXISTS "Order"
+  ADD COLUMN IF NOT EXISTS "isReviewed" BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE IF EXISTS "OrderItem"
+  ADD COLUMN IF NOT EXISTS reviewed BOOLEAN NOT NULL DEFAULT false;
 
 ALTER TABLE IF EXISTS "PaymentTransaction"
   ADD COLUMN IF NOT EXISTS "orderPayload" JSONB;

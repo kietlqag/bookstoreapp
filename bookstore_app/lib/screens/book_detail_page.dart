@@ -617,15 +617,25 @@ class _ReviewList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (reviews.isEmpty) {
-      return const Text(
-        'Chưa có đánh giá.',
-        style: TextStyle(color: AppColors.gray600),
-      );
-    }
+    final sampleReview = Review(
+      id: 0,
+      bookId: 0,
+      userName: 'Kh�ch h�ng',
+      rating: 5,
+      comment: 'S�ch hay, n?i dung d? hi?u. M�nh r?t h�i l�ng.',
+      images: const [
+        'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=400&q=80',
+      ],
+      videos: const [
+        'https://sample-videos.com/video321/mp4/720/big_buck_bunny_720p_1mb.mp4',
+      ],
+      createdAt: null,
+    );
+    final displayReviews = reviews.isEmpty ? [sampleReview] : reviews;
 
     return Column(
-      children: reviews.map((review) {
+      children: displayReviews.map((review) {
+        final isSample = review.id == 0 && reviews.isEmpty;
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: const BoxDecoration(
@@ -650,12 +660,22 @@ class _ReviewList extends StatelessWidget {
                     Text(
                       review.userName.isNotEmpty
                           ? review.userName
-                          : 'Người dùng',
+                          : 'Ngu?i d�ng',
                       style: Theme.of(context)
                           .textTheme
                           .bodyMedium
                           ?.copyWith(fontWeight: FontWeight.w600),
                     ),
+                    if (isSample) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        '��nh gi� m?u',
+                        style: Theme.of(context)
+                            .textTheme
+                            .labelSmall
+                            ?.copyWith(color: AppColors.gray500),
+                      ),
+                    ],
                     const SizedBox(height: 4),
                     Row(
                       children: List.generate(
@@ -677,6 +697,54 @@ class _ReviewList extends StatelessWidget {
                           .bodySmall
                           ?.copyWith(color: AppColors.gray600),
                     ),
+                    if (review.images.isNotEmpty || review.videos.isNotEmpty) ...[
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          ...review.images.map((imageUrl) {
+                            return ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: SizedBox(
+                                width: 72,
+                                height: 72,
+                                child: Image.network(
+                                  imageUrl,
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => Container(
+                                    color: AppColors.gray100,
+                                    alignment: Alignment.center,
+                                    child: const Icon(
+                                      Icons.image_outlined,
+                                      size: 18,
+                                      color: AppColors.gray500,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                          ...review.videos.map((_) {
+                            return Container(
+                              width: 72,
+                              height: 72,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(10),
+                                color: AppColors.gray100,
+                                border: Border.all(color: AppColors.gray200),
+                              ),
+                              alignment: Alignment.center,
+                              child: const Icon(
+                                Icons.play_circle_outline,
+                                size: 22,
+                                color: AppColors.gray600,
+                              ),
+                            );
+                          }),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),

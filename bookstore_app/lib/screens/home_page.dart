@@ -192,6 +192,22 @@ class _HomeTabState extends State<_HomeTab> {
     }
   }
 
+  void _openFeaturedPage() {
+    final featuredByRating = [...widget.books]
+      ..sort((a, b) => b.rating.compareTo(a.rating));
+    final topFeaturedBooks = featuredByRating.take(30).toList();
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => FeaturedBooksPage(
+          books: topFeaturedBooks,
+          favoriteIds: widget.favoriteIds,
+          onOpenBook: widget.onOpenBook,
+          onToggleFavorite: widget.onToggleFavorite,
+        ),
+      ),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -248,10 +264,9 @@ class _HomeTabState extends State<_HomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    final featuredBooks = widget.books
-        .where((book) => book.rating >= 4.5)
-        .take(5)
-        .toList();
+    final featuredByRating = [...widget.books]
+      ..sort((a, b) => b.rating.compareTo(a.rating));
+    final featuredBooks = featuredByRating.take(5).toList();
     final bestSellerBooks = [...widget.books]
       ..sort((a, b) => b.soldQuantity.compareTo(a.soldQuantity));
     final bestSellerTop5 = bestSellerBooks.take(5).toList();
@@ -407,18 +422,7 @@ class _HomeTabState extends State<_HomeTab> {
         _SectionHeader(
           title: 'Nổi bật',
           icon: Icons.auto_awesome,
-          onViewAll: () {
-            Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => FeaturedBooksPage(
-                  books: widget.books,
-                  favoriteIds: widget.favoriteIds,
-                  onOpenBook: widget.onOpenBook,
-                  onToggleFavorite: widget.onToggleFavorite,
-                ),
-              ),
-            );
-          },
+          onViewAll: _openFeaturedPage,
         ),
         SizedBox(
           height: 260,
