@@ -98,17 +98,13 @@ class HeaderBar extends StatelessWidget {
             Expanded(flex: middleFlex, child: middle!),
             const SizedBox(width: 6),
           ],
-          if (actions != null)
-            Expanded(
-              child: Align(
-                alignment: Alignment.centerRight,
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: actions!,
-                ),
-              ),
-            )
-          else ...[
+          if (actions != null) ...[
+            const Spacer(),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: actions!,
+            ),
+          ] else ...[
             const Spacer(),
             Row(
               children: [

@@ -424,7 +424,7 @@ class _HomeTabState extends State<_HomeTab> {
             );
           }),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 24),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
@@ -432,24 +432,35 @@ class _HomeTabState extends State<_HomeTab> {
             children: [
               Row(
                 children: [
-                  const Icon(
-                    Icons.category_outlined,
-                    color: AppColors.orange600,
-                    size: 20,
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: AppColors.orange100,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.category_outlined,
+                      color: AppColors.orange600,
+                      size: 18,
+                    ),
                   ),
-                  const SizedBox(width: 8),
-              Text(
-                'Danh mục',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontWeight: FontWeight.w600),
-              ),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Danh mục',
+                    style: Theme.of(context)
+                        .textTheme
+                        .titleMedium
+                        ?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.gray900,
+                          letterSpacing: -0.3,
+                        ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 16),
               SizedBox(
-                height: 40,
+                height: 38,
                 child: ListView.separated(
                   scrollDirection: Axis.horizontal,
                   itemBuilder: (context, index) {
@@ -475,7 +486,7 @@ class _HomeTabState extends State<_HomeTab> {
                       },
                     );
                   },
-                  separatorBuilder: (_, __) => const SizedBox(width: 8),
+                  separatorBuilder: (_, __) => const SizedBox(width: 10),
                   itemCount: _categories.length,
                 ),
               ),
@@ -611,36 +622,95 @@ class _FlashHeader extends StatelessWidget {
     final minutes = _twoDigits(timeLeft.inMinutes.remainder(60));
     final seconds = _twoDigits(timeLeft.inSeconds.remainder(60));
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Row(
-          children: [
-            const Icon(Icons.bolt, color: AppColors.orange600),
-            const SizedBox(width: 6),
-            Text(
-              'Flash sale',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleMedium
-                  ?.copyWith(fontWeight: FontWeight.w700),
-            ),
-          ],
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFFFF6B35), Color(0xFFFF3366)],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
         ),
-        Row(
-          children: [
-            _TimeChip(value: hours),
-            const SizedBox(width: 4),
-            const Text(':'),
-            const SizedBox(width: 4),
-            _TimeChip(value: minutes),
-            const SizedBox(width: 4),
-            const Text(':'),
-            const SizedBox(width: 4),
-            _TimeChip(value: seconds),
-          ],
-        ),
-      ],
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFFFF6B35).withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.bolt,
+                  color: Colors.white,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'FLASH SALE',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          letterSpacing: 1,
+                        ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    'Kết thúc sau',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.white.withOpacity(0.8),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          Row(
+            children: [
+              _TimeChip(value: hours),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 3),
+                child: Text(
+                  ':',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              _TimeChip(value: minutes),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 3),
+                child: Text(
+                  ':',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              _TimeChip(value: seconds),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
@@ -653,17 +723,27 @@ class _TimeChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      width: 32,
+      height: 32,
+      alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: AppColors.gray100,
+        color: Colors.white,
         borderRadius: BorderRadius.circular(8),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Text(
         value,
-        style: Theme.of(context).textTheme.labelMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: AppColors.gray900,
-            ),
+        style: const TextStyle(
+          fontWeight: FontWeight.w800,
+          fontSize: 14,
+          color: Color(0xFFFF3366),
+        ),
       ),
     );
   }
@@ -677,74 +757,124 @@ class _FlashCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final hasDiscount = book.discount > 0;
+    final discountPrice = hasDiscount
+        ? book.price * (1 - book.discount / 100)
+        : book.price;
+
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(18),
+      borderRadius: BorderRadius.circular(16),
       child: Container(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          gradient: const LinearGradient(
-            colors: [Color(0xFFFFF7ED), Color(0xFFFFE4E6)],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+          borderRadius: BorderRadius.circular(16),
+          color: Colors.white,
+          border: Border.all(
+            color: AppColors.gray100,
+            width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.08),
-              blurRadius: 16,
-              offset: const Offset(0, 8),
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Row(
           children: [
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(14),
-                child: Image.network(
-                  book.cover,
-                  width: 110,
-                  height: double.infinity,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    width: 110,
-                    color: AppColors.gray100,
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      Icons.menu_book,
-                      color: AppColors.gray600,
-                      size: 32,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(0, 14, 16, 14),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.8),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Text(
-                        'Flash sale',
-                        style: TextStyle(
-                          color: AppColors.orange600,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 12,
+            // Image with discount badge
+            Stack(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.network(
+                      book.cover,
+                      width: 100,
+                      height: double.infinity,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        width: 100,
+                        color: AppColors.gray100,
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.menu_book,
+                          color: AppColors.gray600,
+                          size: 32,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 10),
+                  ),
+                ),
+                // Discount badge
+                if (hasDiscount)
+                  Positioned(
+                    top: 6,
+                    left: 6,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFFF6B35), Color(0xFFFF3366)],
+                        ),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '-${book.discount.toInt()}%',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+            // Content
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(4, 12, 14, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Flash sale tag
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFFEBEB),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.bolt,
+                            size: 12,
+                            color: Color(0xFFFF3366),
+                          ),
+                          const SizedBox(width: 2),
+                          Text(
+                            'Flash Sale',
+                            style: TextStyle(
+                              color: Color(0xFFFF3366),
+                              fontWeight: FontWeight.w700,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Title
                     Text(
                       book.title,
                       maxLines: 2,
@@ -752,34 +882,57 @@ class _FlashCard extends StatelessWidget {
                       style: Theme.of(context)
                           .textTheme
                           .titleSmall
-                          ?.copyWith(fontWeight: FontWeight.w700),
+                          ?.copyWith(
+                            fontWeight: FontWeight.w700,
+                            height: 1.2,
+                          ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
+                    // Author
                     Text(
                       book.author,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: Theme.of(context)
                           .textTheme
                           .bodySmall
-                          ?.copyWith(color: AppColors.gray600),
+                          ?.copyWith(color: AppColors.gray500),
                     ),
                     const Spacer(),
-                    Row(
+                    // Price section
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Icon(
-                          Icons.local_fire_department,
-                          size: 16,
-                          color: AppColors.rose500,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          formatPrice(book.price),
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelLarge
-                              ?.copyWith(
-                                color: AppColors.orange600,
-                                fontWeight: FontWeight.w700,
+                        // Original price (strikethrough)
+                        if (hasDiscount)
+                          Text(
+                            formatPrice(book.price),
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: AppColors.gray400,
+                              decoration: TextDecoration.lineThrough,
+                              decorationColor: AppColors.gray400,
+                            ),
+                          ),
+                        const SizedBox(height: 2),
+                        // Discount price
+                        Row(
+                          children: [
+                            const Icon(
+                              Icons.local_fire_department,
+                              size: 16,
+                              color: Color(0xFFFF3366),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              formatPrice(discountPrice),
+                              style: const TextStyle(
+                                color: Color(0xFFFF3366),
+                                fontWeight: FontWeight.w800,
+                                fontSize: 15,
                               ),
+                            ),
+                          ],
                         ),
                       ],
                     ),

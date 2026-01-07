@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../models/notification_service.dart';
 import '../widgets/app_colors.dart';
-import '../widgets/header.dart';
 import 'notification_detail_page.dart';
 
 class NotificationListPage extends StatefulWidget {
@@ -88,39 +87,65 @@ class _NotificationListPageState extends State<NotificationListPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('Thông báo'),
+        centerTitle: false,
+        toolbarHeight: 44,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        iconTheme: const IconThemeData(color: Colors.white),
+        titleTextStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
+            ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        flexibleSpace: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.orange600,
+                AppColors.rose500,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        actions: [
+          // Mark all as read button - sát mép phải
+          if (_notifications.any((n) => !n.isRead))
+            Padding(
+              padding: const EdgeInsets.only(right: 4),
+              child: TextButton.icon(
+                onPressed: _markAllAsRead,
+                icon: const Icon(
+                  Icons.done_all,
+                  size: 14,
+                  color: Colors.white,
+                ),
+                label: const Text(
+                  'Đọc tất cả',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+              ),
+            ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
-            HeaderBar(
-              title: 'Thông báo',
-              showBack: true,
-              onBack: () => Navigator.of(context).pop(),
-              backgroundGradient: LinearGradient(
-                colors: [
-                  AppColors.orange600,
-                  AppColors.rose500,
-                ],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
-              ),
-              titleColor: Colors.white,
-              iconColor: Colors.white,
-              actions: [
-                // Mark all as read button
-                if (_notifications.any((n) => !n.isRead))
-                  TextButton(
-                    onPressed: _markAllAsRead,
-                    child: const Text(
-                      'Đọc tất cả',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
             Expanded(
               child: _loading
                   ? const Center(

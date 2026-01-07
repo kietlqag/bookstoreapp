@@ -16,22 +16,40 @@ class CategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return OutlinedButton(
-      onPressed: onTap,
-      style: OutlinedButton.styleFrom(
-        backgroundColor: isActive ? AppColors.orange600 : AppColors.gray100,
-        foregroundColor: isActive ? Colors.white : AppColors.gray600,
-        side: BorderSide.none,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontWeight: FontWeight.w600,
-          color: isActive ? Colors.white : AppColors.gray600,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+          decoration: BoxDecoration(
+            color: isActive ? AppColors.orange600 : AppColors.gray50,
+            borderRadius: BorderRadius.circular(20),
+            border: isActive
+                ? null
+                : Border.all(
+                    color: AppColors.gray200,
+                    width: 1,
+                  ),
+            boxShadow: isActive
+                ? [
+                    BoxShadow(
+                      color: AppColors.orange600.withOpacity(0.25),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.w500,
+              fontSize: 12,
+              color: isActive ? Colors.white : AppColors.gray700,
+            ),
+          ),
         ),
       ),
     );

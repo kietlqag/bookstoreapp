@@ -25,9 +25,18 @@ class CategoryBooksPage extends StatefulWidget {
   State<CategoryBooksPage> createState() => _CategoryBooksPageState();
 }
 
+enum SortOption {
+  none,
+  priceAsc,
+  priceDesc,
+  ratingDesc,
+  soldDesc,
+}
+
 class _CategoryBooksPageState extends State<CategoryBooksPage> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
+  SortOption _sortOption = SortOption.none;
 
   String _normalize(String input) {
     var output = input.toLowerCase();
@@ -62,11 +71,108 @@ class _CategoryBooksPageState extends State<CategoryBooksPage> {
     super.dispose();
   }
 
+  String _getSortLabel() {
+    switch (_sortOption) {
+      case SortOption.priceAsc:
+        return 'Giá tăng';
+      case SortOption.priceDesc:
+        return 'Giá giảm';
+      case SortOption.ratingDesc:
+        return 'Đánh giá';
+      case SortOption.soldDesc:
+        return 'Bán chạy';
+      default:
+        return 'Sắp xếp';
+    }
+  }
+
+  void _showSortOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 8),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.gray300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'Sắp xếp theo',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+            ),
+            _SortOptionTile(
+              icon: Icons.attach_money,
+              label: 'Giá tăng dần',
+              isSelected: _sortOption == SortOption.priceAsc,
+              onTap: () {
+                setState(() => _sortOption = SortOption.priceAsc);
+                Navigator.pop(context);
+              },
+            ),
+            _SortOptionTile(
+              icon: Icons.money_off,
+              label: 'Giá giảm dần',
+              isSelected: _sortOption == SortOption.priceDesc,
+              onTap: () {
+                setState(() => _sortOption = SortOption.priceDesc);
+                Navigator.pop(context);
+              },
+            ),
+            _SortOptionTile(
+              icon: Icons.star_outline,
+              label: 'Đánh giá cao nhất',
+              isSelected: _sortOption == SortOption.ratingDesc,
+              onTap: () {
+                setState(() => _sortOption = SortOption.ratingDesc);
+                Navigator.pop(context);
+              },
+            ),
+            _SortOptionTile(
+              icon: Icons.local_fire_department_outlined,
+              label: 'Bán chạy nhất',
+              isSelected: _sortOption == SortOption.soldDesc,
+              onTap: () {
+                setState(() => _sortOption = SortOption.soldDesc);
+                Navigator.pop(context);
+              },
+            ),
+            if (_sortOption != SortOption.none)
+              _SortOptionTile(
+                icon: Icons.clear,
+                label: 'Bỏ sắp xếp',
+                isSelected: false,
+                onTap: () {
+                  setState(() => _sortOption = SortOption.none);
+                  Navigator.pop(context);
+                },
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final normalizedCategory = _normalize(widget.category);
     final isAll = normalizedCategory == 'tat ca';
-    final categoryBooks = widget.books.where((book) {
+    var categoryBooks = widget.books.where((book) {
       if (isAll) return true;
       return _normalize(book.category) == normalizedCategory;
     }).where((book) {
@@ -75,6 +181,32 @@ class _CategoryBooksPageState extends State<CategoryBooksPage> {
       return _normalize(book.title).contains(term) ||
           _normalize(book.author).contains(term);
     }).toList();
+
+    // Helper to calculate final price after discount
+    double getFinalPrice(Book book) {
+      if (book.discount > 0) {
+        return book.price * (1 - book.discount / 100);
+      }
+      return book.price;
+    }
+
+    // Apply sorting
+    switch (_sortOption) {
+      case SortOption.priceAsc:
+        categoryBooks.sort((a, b) => getFinalPrice(a).compareTo(getFinalPrice(b)));
+        break;
+      case SortOption.priceDesc:
+        categoryBooks.sort((a, b) => getFinalPrice(b).compareTo(getFinalPrice(a)));
+        break;
+      case SortOption.ratingDesc:
+        categoryBooks.sort((a, b) => b.rating.compareTo(a.rating));
+        break;
+      case SortOption.soldDesc:
+        categoryBooks.sort((a, b) => b.soldQuantity.compareTo(a.soldQuantity));
+        break;
+      default:
+        break;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -100,19 +232,20 @@ class _CategoryBooksPageState extends State<CategoryBooksPage> {
       ),
       body: Column(
         children: [
+          // Search bar và sort button
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+            padding: const EdgeInsets.fromLTRB(16, 10, 16, 6),
             child: Row(
               children: [
+                // Search field - compact
                 Expanded(
                   child: Container(
-                    height: 42,
+                    height: 36,
                     decoration: BoxDecoration(
-                      color: AppColors.gray100,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: AppColors.gray200),
+                      color: AppColors.gray50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: AppColors.gray200, width: 0.5),
                     ),
-                    alignment: Alignment.center,
                     child: TextField(
                       controller: _searchController,
                       onChanged: (value) {
@@ -120,48 +253,102 @@ class _CategoryBooksPageState extends State<CategoryBooksPage> {
                           _query = value.trim();
                         });
                       },
+                      style: const TextStyle(fontSize: 13),
                       textAlignVertical: TextAlignVertical.center,
                       decoration: InputDecoration(
-                        hintText: 'Tìm kiếm sách...',
-                        prefixIcon: const Icon(Icons.search),
+                        hintText: 'Tìm kiếm...',
+                        hintStyle: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.gray400,
+                        ),
+                        prefixIcon: Icon(
+                          Icons.search,
+                          size: 18,
+                          color: AppColors.gray400,
+                        ),
+                        prefixIconConstraints: const BoxConstraints(
+                          minWidth: 36,
+                        ),
                         border: InputBorder.none,
+                        enabledBorder: InputBorder.none,
+                        focusedBorder: InputBorder.none,
+                        filled: false,
                         isDense: true,
-                        contentPadding:
-                            const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 0,
+                          vertical: 10,
+                        ),
                         suffixIcon: _searchController.text.isEmpty
                             ? null
-                            : IconButton(
-                                icon: const Icon(Icons.close, size: 18),
-                                color: AppColors.gray600,
-                                onPressed: () {
+                            : GestureDetector(
+                                onTap: () {
                                   _searchController.clear();
                                   setState(() {
                                     _query = '';
                                   });
                                 },
+                                child: Icon(
+                                  Icons.close,
+                                  size: 16,
+                                  color: AppColors.gray400,
+                                ),
                               ),
+                        suffixIconConstraints: const BoxConstraints(
+                          minWidth: 32,
+                        ),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 10),
-                SizedBox(
-                  height: 42,
-                  width: 42,
-                  child: OutlinedButton(
-                    onPressed: () {},
-                    style: OutlinedButton.styleFrom(
-                      padding: EdgeInsets.zero,
-                      side: const BorderSide(color: AppColors.gray200),
-                      backgroundColor: AppColors.gray100,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+                const SizedBox(width: 8),
+                // Sort button
+                GestureDetector(
+                  onTap: _showSortOptions,
+                  child: Container(
+                    height: 36,
+                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                    decoration: BoxDecoration(
+                      color: _sortOption != SortOption.none
+                          ? AppColors.orange50
+                          : AppColors.gray50,
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: _sortOption != SortOption.none
+                            ? AppColors.orange200
+                            : AppColors.gray200,
+                        width: 0.5,
                       ),
                     ),
-                    child: const Icon(
-                      Icons.tune,
-                      size: 20,
-                      color: AppColors.gray700,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.sort,
+                          size: 16,
+                          color: _sortOption != SortOption.none
+                              ? AppColors.orange600
+                              : AppColors.gray500,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          _getSortLabel(),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                            color: _sortOption != SortOption.none
+                                ? AppColors.orange600
+                                : AppColors.gray600,
+                          ),
+                        ),
+                        const SizedBox(width: 2),
+                        Icon(
+                          Icons.keyboard_arrow_down,
+                          size: 16,
+                          color: _sortOption != SortOption.none
+                              ? AppColors.orange600
+                              : AppColors.gray500,
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -203,6 +390,49 @@ class _CategoryBooksPageState extends State<CategoryBooksPage> {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _SortOptionTile extends StatelessWidget {
+  const _SortOptionTile({
+    required this.icon,
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(
+        icon,
+        color: isSelected ? AppColors.orange600 : AppColors.gray600,
+        size: 22,
+      ),
+      title: Text(
+        label,
+        style: TextStyle(
+          fontSize: 14,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+          color: isSelected ? AppColors.orange600 : AppColors.gray700,
+        ),
+      ),
+      trailing: isSelected
+          ? const Icon(
+              Icons.check,
+              color: AppColors.orange600,
+              size: 20,
+            )
+          : null,
+      onTap: onTap,
+      dense: true,
+      visualDensity: VisualDensity.compact,
     );
   }
 }
