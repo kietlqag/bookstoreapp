@@ -9,13 +9,22 @@ import '../models/profile_summary.dart';
 import 'edit_profile_page.dart';
 import 'order_list_page.dart';
 import 'review_list_page.dart';
+import 'settings_notification_page.dart';
+import 'settings_help_page.dart';
+import 'settings_privacy_page.dart';
 import '../widgets/app_colors.dart';
 
 class ProfilePage extends StatefulWidget {
-  const ProfilePage({super.key, required this.onLogout, required this.userId});
+  const ProfilePage({
+    super.key,
+    required this.onLogout,
+    required this.userId,
+    required this.token,
+  });
 
   final VoidCallback onLogout;
   final int userId;
+  final String token;
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -115,12 +124,6 @@ class _ProfilePageState extends State<ProfilePage> {
     final monthlySpend = (summary?.monthlySpend ?? 0.0).toStringAsFixed(0);
     final rankLabel = _resolveRankLabel(summary?.totalSpend ?? 0.0);
     final rankColor = _resolveRankColor(rankLabel);
-
-    final settingsItems = [
-      'Thông báo',
-      'Trợ giúp & hỗ trợ',
-      'Quyền riêng tư & bảo mật',
-    ];
 
     return Column(
       children: [
@@ -443,9 +446,42 @@ class _ProfilePageState extends State<ProfilePage> {
                     ],
                   ),
                   child: Column(
-                    children: settingsItems
-                        .map((title) => _SettingsTile(title: title))
-                        .toList(),
+                    children: [
+                      _SettingsTile(
+                        title: 'Thông báo',
+                        icon: Icons.notifications_outlined,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SettingsNotificationPage(),
+                          ),
+                        ),
+                      ),
+                      _SettingsTile(
+                        title: 'Trợ giúp & hỗ trợ',
+                        icon: Icons.help_outline,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => SettingsHelpPage(userId: widget.userId),
+                          ),
+                        ),
+                      ),
+                      _SettingsTile(
+                        title: 'Quyền riêng tư & bảo mật',
+                        icon: Icons.security_outlined,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => SettingsPrivacyPage(
+                              userId: widget.userId,
+                              token: widget.token,
+                              onLogout: widget.onLogout,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -647,19 +683,25 @@ class _AvatarFallback extends StatelessWidget {
 }
 
 class _SettingsTile extends StatelessWidget {
-  const _SettingsTile({required this.title});
+  const _SettingsTile({
+    required this.title,
+    required this.icon,
+    required this.onTap,
+  });
 
   final String title;
+  final IconData icon;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () {},
+      onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
           children: [
-            const Icon(Icons.settings_outlined, color: AppColors.gray600),
+            Icon(icon, color: AppColors.gray600),
             const SizedBox(width: 12),
             Expanded(
               child: Text(title, style: Theme.of(context).textTheme.bodyMedium),

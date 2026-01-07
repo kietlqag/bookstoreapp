@@ -147,6 +147,7 @@ class _HomePageState extends State<HomePage> {
       'profile': ProfilePage(
         onLogout: widget.onLogout,
         userId: widget.userId,
+        token: widget.token,
       ),
     };
 

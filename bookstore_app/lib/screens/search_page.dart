@@ -307,30 +307,43 @@ class _SearchPageState extends State<SearchPage> {
                   const SizedBox(height: 12),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: GridView.builder(
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                      itemCount: (query.isEmpty
-                              ? widget.books.take(6).toList()
-                              : filtered)
-                          .length,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 12,
-                        crossAxisSpacing: 12,
-                        childAspectRatio: 0.6,
-                      ),
-                      itemBuilder: (context, index) {
-                        final list =
-                            query.isEmpty ? widget.books.take(6).toList() : filtered;
-                        final book = list[index];
-                        return BookCard(
-                          book: book,
-                          compact: true,
-                          onTap: () => widget.onOpenBook(book),
-                          isFavorite: widget.favoriteIds.contains(book.id),
-                          onFavoriteTap: () => _handleFavorite(book),
+                    child: Builder(
+                      builder: (context) {
+                        // Sách phổ biến: sắp theo rating cao nhất, sau đó theo soldQuantity nhiều nhất
+                        final popularBooks = query.isEmpty
+                            ? (List<Book>.from(widget.books)
+                              ..sort((a, b) {
+                                // So sánh rating trước
+                                final ratingCompare = b.rating.compareTo(a.rating);
+                                if (ratingCompare != 0) return ratingCompare;
+                                // Nếu rating bằng nhau, so sánh soldQuantity
+                                return b.soldQuantity.compareTo(a.soldQuantity);
+                              }))
+                            .take(10)
+                            .toList()
+                            : filtered;
+
+                        return GridView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: popularBooks.length,
+                          gridDelegate:
+                              const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            mainAxisSpacing: 12,
+                            crossAxisSpacing: 12,
+                            childAspectRatio: 0.6,
+                          ),
+                          itemBuilder: (context, index) {
+                            final book = popularBooks[index];
+                            return BookCard(
+                              book: book,
+                              compact: true,
+                              onTap: () => widget.onOpenBook(book),
+                              isFavorite: widget.favoriteIds.contains(book.id),
+                              onFavoriteTap: () => _handleFavorite(book),
+                            );
+                          },
                         );
                       },
                     ),
