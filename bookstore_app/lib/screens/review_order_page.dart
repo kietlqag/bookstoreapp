@@ -14,38 +14,74 @@ class ReviewOrderPage extends StatefulWidget {
     required this.order,
     required this.userId,
     required this.reviewService,
+    this.isEditing = false,
   });
 
   final OrderSummary order;
   final int userId;
   final ReviewService reviewService;
+  final bool isEditing;
 
   @override
   State<ReviewOrderPage> createState() => _ReviewOrderPageState();
+}
+
+class _ReviewDraft {
+  _ReviewDraft({
+    this.reviewId,
+    required this.rating,
+    required this.comment,
+    required this.anonymous,
+    List<String>? existingImages,
+    List<String>? existingVideos,
+    List<XFile>? newImages,
+    List<XFile>? newVideos,
+  })  : existingImages = existingImages ?? [],
+        existingVideos = existingVideos ?? [],
+        newImages = newImages ?? [],
+        newVideos = newVideos ?? [];
+
+  final int? reviewId;
+  int rating;
+  String comment;
+  bool anonymous;
+  final List<String> existingImages;
+  final List<String> existingVideos;
+  final List<XFile> newImages;
+  final List<XFile> newVideos;
 }
 
 class _ReviewOrderPageState extends State<ReviewOrderPage> {
   static const int _minChars = 50;
   final TextEditingController _commentController = TextEditingController();
   final ImagePicker _picker = ImagePicker();
-  final List<XFile> _selectedImages = [];
-  final List<XFile> _selectedVideos = [];
+  final Map<int, _ReviewDraft> _drafts = {};
   late List<OrderItemSummary> _pendingItems;
   int _productRating = 5;
   int _selectedProductIndex = 0;
   int _commentLength = 0;
   bool _anonymous = false;
   bool _isSubmitting = false;
+  bool _loadingExisting = false;
 
   @override
   void initState() {
     super.initState();
-    _pendingItems = widget.order.items.where((item) => !item.reviewed).toList();
-    _commentController.addListener(() {
-      setState(() {
-        _commentLength = _commentController.text.trim().length;
-      });
-    });
+    _pendingItems = widget.isEditing
+        ? List<OrderItemSummary>.from(widget.order.items)
+        : widget.order.items.where((item) => !item.reviewed).toList();
+    for (final item in _pendingItems) {
+      _drafts[item.id] = _ReviewDraft(
+        rating: 5,
+        comment: '',
+        anonymous: false,
+      );
+    }
+    _loadDraftForSelectedItem();
+    if (widget.isEditing) {
+      _loadingExisting = true;
+      _loadExistingReviews();
+    }
   }
 
   @override
@@ -65,6 +101,83 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
     return _selectedProductIndex.clamp(0, _pendingItems.length - 1);
   }
 
+  _ReviewDraft? get _currentDraft {
+    final selected = _selectedItem;
+    if (selected == null) return null;
+    return _drafts[selected.id];
+  }
+
+  _ReviewDraft? _ensureDraftForSelected() {
+    final selected = _selectedItem;
+    if (selected == null) return null;
+    return _drafts.putIfAbsent(
+      selected.id,
+      () => _ReviewDraft(
+        rating: 5,
+        comment: '',
+        anonymous: false,
+      ),
+    );
+  }
+
+  void _loadDraftForSelectedItem() {
+    final draft = _ensureDraftForSelected();
+    if (draft == null) return;
+    _productRating = draft.rating;
+    _anonymous = draft.anonymous;
+    if (_commentController.text != draft.comment) {
+      _commentController.text = draft.comment;
+      _commentController.selection = TextSelection.fromPosition(
+        TextPosition(offset: _commentController.text.length),
+      );
+    }
+    _commentLength = draft.comment.trim().length;
+  }
+
+  Future<void> _loadExistingReviews() async {
+    try {
+      final reviews = await widget.reviewService.fetchOrderReviews(
+        orderId: widget.order.id,
+        userId: widget.userId,
+      );
+      if (!mounted) return;
+      for (final review in reviews) {
+        final roundedRating = review.rating.round();
+        final safeRating = roundedRating < 1
+            ? 1
+            : (roundedRating > 5 ? 5 : roundedRating);
+        _drafts[review.orderItemId] = _ReviewDraft(
+          reviewId: review.id,
+          rating: safeRating,
+          comment: review.comment,
+          anonymous: review.anonymous,
+          existingImages: review.images,
+          existingVideos: review.videos,
+        );
+      }
+      for (final item in _pendingItems) {
+        _drafts.putIfAbsent(
+          item.id,
+          () => _ReviewDraft(
+            rating: 5,
+            comment: '',
+            anonymous: false,
+          ),
+        );
+      }
+      setState(() {
+        _loadingExisting = false;
+        _loadDraftForSelectedItem();
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loadingExisting = false;
+      });
+      _showMessage(error.toString());
+    }
+  }
+
   void _showMessage(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -75,12 +188,19 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
   Future<void> _submitReview() async {
     final selectedItem = _selectedItem;
     if (selectedItem == null) {
-      _showMessage('Kh�ng c� s?n ph?m d? d�nh gi�.');
+    _showMessage('Kh\u00f4ng c\u00f3 s\u1ea3n ph\u1ea5m \u0111\u1ec3 \u0111\u00e1nh gi\u00e1.');
+      return;
+    }
+    final draft = _ensureDraftForSelected();
+    if (draft == null) {
+      _showMessage('Khong tim thay du lieu danh gia.');
       return;
     }
     final trimmedComment = _commentController.text.trim();
     if (trimmedComment.length < _minChars) {
-      _showMessage('Vui l�ng nh?p t?i thi?u $_minChars k� t?.');
+      _showMessage(
+        'Vui long nhap toi thieu ' + _minChars.toString() + ' ky tu.',
+      );
       return;
     }
 
@@ -88,7 +208,47 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
     try {
       final userName = widget.order.recipientName.isNotEmpty
           ? widget.order.recipientName
-          : 'Kh�ch h�ng';
+          : 'Khach hang';
+      if (widget.isEditing) {
+        if (draft.reviewId == null) {
+          _showMessage('Khong tim thay danh gia de sua.');
+          return;
+        }
+        final mergedImages = [
+          ...draft.existingImages,
+          ...draft.newImages.map((file) => file.path),
+        ];
+        final mergedVideos = [
+          ...draft.existingVideos,
+          ...draft.newVideos.map((file) => file.path),
+        ];
+        await widget.reviewService.updateReview(
+          reviewId: draft.reviewId!,
+          userId: widget.userId,
+          userName: userName,
+          rating: _productRating,
+          comment: trimmedComment,
+          anonymous: _anonymous,
+          images: mergedImages,
+          videos: mergedVideos,
+        );
+        setState(() {
+          draft.rating = _productRating;
+          draft.comment = trimmedComment;
+          draft.anonymous = _anonymous;
+          draft.existingImages
+            ..clear()
+            ..addAll(mergedImages);
+          draft.existingVideos
+            ..clear()
+            ..addAll(mergedVideos);
+          draft.newImages.clear();
+          draft.newVideos.clear();
+        });
+        _showMessage('Da cap nhat danh gia.');
+        return;
+      }
+
       final remaining = await widget.reviewService.submitReview(
         orderId: widget.order.id,
         orderItemId: selectedItem.id,
@@ -98,17 +258,9 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
         rating: _productRating,
         comment: trimmedComment,
         anonymous: _anonymous,
-        images: _selectedImages.map((file) => file.path).toList(),
-        videos: _selectedVideos.map((file) => file.path).toList(),
+        images: draft.newImages.map((file) => file.path).toList(),
+        videos: draft.newVideos.map((file) => file.path).toList(),
       );
-
-      setState(() {
-        _selectedImages.clear();
-        _selectedVideos.clear();
-        _productRating = 5;
-        _commentController.clear();
-        _commentLength = 0;
-      });
 
       if (remaining == 0) {
         if (mounted) Navigator.of(context).pop(true);
@@ -117,12 +269,18 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
 
       setState(() {
         _pendingItems.removeAt(_safeIndex);
+        _drafts.remove(selectedItem.id);
         if (_selectedProductIndex >= _pendingItems.length) {
           _selectedProductIndex =
               _pendingItems.isEmpty ? 0 : _pendingItems.length - 1;
         }
+        _loadDraftForSelectedItem();
       });
-      _showMessage('�� g?i d�nh gi�. C�n $remaining s?n ph?m chua d�nh gi�.');
+      _showMessage(
+        'Da gui danh gia. Con ' +
+            remaining.toString() +
+            ' s\u1ea3n ph\u1ea5m ch\u01b0a \u0111\u00e1nh gi\u00e1.',
+      );
     } catch (error) {
       _showMessage(error.toString());
     } finally {
@@ -136,22 +294,29 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
       imageQuality: 70,
     );
     if (file == null) return;
-    setState(() => _selectedImages.add(file));
+    final draft = _ensureDraftForSelected();
+    if (draft == null) return;
+    setState(() => draft.newImages.add(file));
   }
 
   Future<void> _pickVideo(ImageSource source) async {
     final file = await _picker.pickVideo(source: source);
     if (file == null) return;
-    setState(() => _selectedVideos.add(file));
+    final draft = _ensureDraftForSelected();
+    if (draft == null) return;
+    setState(() => draft.newVideos.add(file));
   }
 
   Widget _buildSelectedImages() {
-    if (_selectedImages.isEmpty) return const SizedBox.shrink();
+    final draft = _currentDraft;
+    if (draft == null || draft.newImages.isEmpty) {
+      return const SizedBox.shrink();
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Ảnh đã chọn',
+          '\u1ea2nh \u0111\u00e3 ch\u1ecdn',
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 6),
@@ -159,10 +324,10 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
           height: 102,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            itemCount: _selectedImages.length,
+            itemCount: draft.newImages.length,
             separatorBuilder: (_, __) => const SizedBox(width: 8),
             itemBuilder: (_, index) {
-              final file = _selectedImages[index];
+              final file = draft.newImages[index];
               return Stack(
                 children: [
                   ClipRRect(
@@ -179,7 +344,7 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
                     right: 4,
                     child: GestureDetector(
                       onTap: () => setState(() {
-                        _selectedImages.removeAt(index);
+                        draft.newImages.removeAt(index);
                       }),
                       child: Container(
                         decoration: BoxDecoration(
@@ -202,19 +367,22 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
   }
 
   Widget _buildSelectedVideos() {
-    if (_selectedVideos.isEmpty) return const SizedBox.shrink();
+    final draft = _currentDraft;
+    if (draft == null || draft.newVideos.isEmpty) {
+      return const SizedBox.shrink();
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Video đã chọn',
+          'Video \u0111\u00e3 ch\u1ecdn',
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
         const SizedBox(height: 6),
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: _selectedVideos.asMap().entries.map((entry) {
+          children: draft.newVideos.asMap().entries.map((entry) {
             final index = entry.key;
             final file = entry.value;
             return Chip(
@@ -224,7 +392,7 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
               ),
               avatar: const Icon(Icons.videocam, size: 20),
               onDeleted: () => setState(() {
-                _selectedVideos.removeAt(index);
+                draft.newVideos.removeAt(index);
               }),
             );
           }).toList(),
@@ -237,6 +405,7 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
   @override
   Widget build(BuildContext context) {
     final hasProducts = _pendingItems.isNotEmpty;
+    final isBusy = _isSubmitting || _loadingExisting;
     return Scaffold(
       backgroundColor: AppColors.gray50,
       appBar: AppBar(
@@ -244,7 +413,7 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(false),
         ),
-        title: const Text('Đánh giá sản phẩm'),
+        title: const Text('\u0110\u00e1nh gi\u00e1 s\u1ea3n ph\u1ea5m'),
         centerTitle: false,
         toolbarHeight: 44,
         elevation: 0,
@@ -271,7 +440,9 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
               children: [
                 _TipBanner(
-                  onTap: () => _showMessage('Xem hướng dẫn đánh giá chuẩn.'),
+                  onTap: () => _showMessage(
+                        'Xem h\u01b0\u1edbng d\u1eabn \u0111\u00e1nh gi\u00e1 chu\u1ea9n.',
+                      ),
                 ),
                 const SizedBox(height: 12),
                 _SectionCard(
@@ -281,7 +452,7 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
                       if (hasProducts) ...[
                         if (_pendingItems.length > 1) ...[
                           Text(
-                            'Chọn sản phẩm muốn đánh giá',
+                            'Ch\u1ecdn s\u1ea3n ph\u1ea5m mu\u1ed1n \u0111\u00e1nh gi\u00e1',
                             style: Theme.of(context)
                                 .textTheme
                                 .labelSmall
@@ -301,6 +472,7 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
                                 if (_selectedProductIndex != index) {
                                   setState(() {
                                     _selectedProductIndex = index;
+                                    _loadDraftForSelectedItem();
                                   });
                                 }
                               },
@@ -310,7 +482,7 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
                         const SizedBox(height: 6),
                       ] else ...[
                         Text(
-                          'Đã đánh giá hết sản phẩm trong đơn.',
+                          '\u0110\u00e3 \u0111\u00e1nh gi\u00e1 h\u1ebft s\u1ea3n ph\u1ea5m trong \u0111\u01a1n.',
                           style: Theme.of(context)
                               .textTheme
                               .bodySmall
@@ -321,7 +493,7 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
                       if (hasProducts) ...[
                         const Divider(height: 24, color: AppColors.gray200),
                         Text(
-                          'Đánh giá sản phẩm',
+                          '\u0110\u00e1nh gi\u00e1 s\u1ea3n ph\u1ea5m',
                           style: Theme.of(context)
                               .textTheme
                               .bodyMedium
@@ -331,12 +503,18 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
                         _StarSelector(
                           rating: _productRating,
                           size: 32,
-                          onChanged: (value) =>
-                              setState(() => _productRating = value),
+                          onChanged: (value) {
+                            final draft = _ensureDraftForSelected();
+                            if (draft == null) return;
+                            setState(() {
+                              _productRating = value;
+                              draft.rating = value;
+                            });
+                          },
                         ),
                         const SizedBox(height: 16),
                         Text(
-                          'Thêm ít nhất 1 hình ảnh/video về sản phẩm',
+                            'Th\u00eam \u00edt nh\u1ea5t 1 h\u00ecnh \u1ea3nh/video v\u1ec1 s\u1ea3n ph\u1ea5m',
                           style: Theme.of(context)
                               .textTheme
                               .labelSmall
@@ -348,7 +526,7 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
                           Expanded(
                             child: _MediaCard(
                               icon: Icons.photo_camera_outlined,
-                              label: 'Hình ảnh',
+                              label: 'H\u00ecnh \u1ea3nh',
                               onCameraTap: () =>
                                   _pickImage(ImageSource.camera),
                             ),
@@ -369,7 +547,7 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
                         _buildSelectedVideos(),
                         const SizedBox(height: 4),
                         Text(
-                          'Viết đánh giá từ $_minChars ký tự',
+                          'Vi\u1ebft \u0111\u00e1nh gi\u00e1 t\u1eeb $_minChars k\u00fd t\u1ef1',
                           style: Theme.of(context)
                               .textTheme
                               .labelSmall
@@ -379,9 +557,17 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
                         TextField(
                           controller: _commentController,
                           maxLines: 5,
+                          onChanged: (value) {
+                            final draft = _ensureDraftForSelected();
+                            if (draft == null) return;
+                            setState(() {
+                              draft.comment = value;
+                              _commentLength = value.trim().length;
+                            });
+                          },
                           decoration: InputDecoration(
                             hintText:
-                                'Hãy chia sẻ nhận xét cho sản phẩm này nhé!',
+                            'H\u00e3y chia s\u1ebb nh\u1eadn x\u00e9t cho s\u1ea3n ph\u1ea5m n\u00e0y nh\u00e9!',
                             hintStyle: Theme.of(context)
                                 .textTheme
                                 .bodySmall
@@ -409,7 +595,7 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
                         Align(
                           alignment: Alignment.centerRight,
                           child: Text(
-                            '$_commentLength ký tự',
+                            '$_commentLength k\u00fd t\u1ef1',
                             style: Theme.of(context)
                                 .textTheme
                                 .labelSmall
@@ -420,13 +606,18 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
                         CheckboxListTile(
                           contentPadding: EdgeInsets.zero,
                           value: _anonymous,
-                          onChanged: (value) => setState(() {
-                            _anonymous = value ?? false;
-                          }),
+                          onChanged: (value) {
+                            final draft = _ensureDraftForSelected();
+                            if (draft == null) return;
+                            setState(() {
+                              _anonymous = value ?? false;
+                              draft.anonymous = _anonymous;
+                            });
+                          },
                           activeColor: AppColors.orange600,
                           controlAffinity: ListTileControlAffinity.leading,
                           title: Text(
-                            'Đánh giá ẩn danh',
+                            '\u0110\u00e1nh gi\u00e1 \u1ea9n danh',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ),
@@ -444,7 +635,7 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: hasProducts && !_isSubmitting
+                  onPressed: hasProducts && !isBusy
                       ? _submitReview
                       : null,
                   style: ElevatedButton.styleFrom(
@@ -467,7 +658,7 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
                             color: AppColors.gray50,
                           ),
                         )
-                      : const Text('Gửi đánh giá'),
+                      : const Text('G\u1eedi \u0111\u00e1nh gi\u00e1'),
                 ),
               ),
             ),
@@ -512,7 +703,7 @@ class _TipBanner extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Xem hướng dẫn đánh giá chuẩn',
+                'Xem h\u01b0\u1edbng d\u1eabn \u0111\u00e1nh gi\u00e1 chu\u1ea9n',
                 style: Theme.of(context)
                     .textTheme
                     .bodySmall
@@ -636,7 +827,7 @@ class _ProductRow extends StatelessWidget {
                   Text(
                     item.bookAuthor.isNotEmpty
                         ? item.bookAuthor
-                        : 'Tác giả chưa rõ',
+                        : 'T\u00e1c gi\u1ea3 ch\u01b0a r\u00f5',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context)
@@ -739,3 +930,8 @@ class _StarSelector extends StatelessWidget {
     );
   }
 }
+
+
+
+
+

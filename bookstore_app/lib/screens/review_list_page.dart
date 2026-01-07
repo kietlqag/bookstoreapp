@@ -1,6 +1,7 @@
-import 'dart:io';
+﻿import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/order.dart';
 import '../models/order_service.dart';
@@ -33,9 +34,8 @@ class _ReviewListPageState extends State<ReviewListPage> {
   String? _error;
 
   final List<Tab> _tabs = const [
-    Tab(text: 'Chưa đánh giá'),
-    Tab(text: 'Đã đánh giá'),
-    Tab(text: 'Đánh giá người bán'),
+    Tab(text: 'Ch\u01b0a \u0111\u00e1nh gi\u00e1'),
+    Tab(text: '\u0110\u00e3 \u0111\u00e1nh gi\u00e1'),
   ];
 
   static String _resolveBaseUrl() {
@@ -76,15 +76,25 @@ class _ReviewListPageState extends State<ReviewListPage> {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return DefaultTabController(
       length: _tabs.length,
       initialIndex: widget.initialIndex.clamp(0, _tabs.length - 1),
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Đánh giá của tôi'),
+          title: const Text('\u0110\u00e1nh gi\u00e1 c\u1ee7a t\u00f4i'),
           centerTitle: false,
           toolbarHeight: 48,
           elevation: 0,
+          backgroundColor: Colors.transparent,
+          surfaceTintColor: Colors.transparent,
+          foregroundColor: Colors.white,
+          systemOverlayStyle: SystemUiOverlayStyle.light,
+          iconTheme: const IconThemeData(color: Colors.white),
+          titleTextStyle: textTheme.titleMedium?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
           flexibleSpace: Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -119,26 +129,14 @@ class _ReviewListPageState extends State<ReviewListPage> {
                       _ReviewListTab(
                         orders: _orders,
                         filter: (order) => !order.isReviewed,
-                        emptyLabel: 'Không còn đánh giá nào',
+                        emptyLabel: 'Kh\u00f4ng c\u1ea7n \u0111\u00e1nh gi\u00e1 n\u00e0o',
                         onReview: _openReviewPage,
-                        countdownLabel: 'Chỉ còn',
-                        showCountdown: true,
                       ),
                       _ReviewListTab(
                         orders: _orders,
                         filter: (order) => order.isReviewed,
-                        emptyLabel: 'Bạn chưa đánh giá đơn nào',
-                        onReview: null,
-                        countdownLabel: 'Đã đánh giá',
-                        showCountdown: false,
-                      ),
-                      _ReviewListTab(
-                        orders: _orders,
-                        filter: (order) => order.isReviewed,
-                        emptyLabel: 'Chưa có đánh giá người bán',
-                        onReview: null,
-                        countdownLabel: 'Đã đánh giá',
-                        showCountdown: false,
+                        emptyLabel: 'B\u1ea1n ch\u01b0a \u0111\u00e1nh gi\u00e1 \u0111\u01a1n n\u00e0o',
+                        onReview: _openReviewPage,
                       ),
                     ],
                   ),
@@ -153,6 +151,7 @@ class _ReviewListPageState extends State<ReviewListPage> {
           order: order,
           userId: widget.userId,
           reviewService: _reviewService,
+          isEditing: order.isReviewed,
         ),
       ),
     );
@@ -162,23 +161,18 @@ class _ReviewListPageState extends State<ReviewListPage> {
   }
 }
 
-
 class _ReviewListTab extends StatelessWidget {
   const _ReviewListTab({
     required this.orders,
     required this.filter,
     required this.emptyLabel,
-    required this.countdownLabel,
-    required this.showCountdown,
     this.onReview,
   });
 
   final List<OrderSummary> orders;
   final String emptyLabel;
-  final String countdownLabel;
   final bool Function(OrderSummary order) filter;
   final ValueChanged<OrderSummary>? onReview;
-  final bool showCountdown;
 
   @override
   Widget build(BuildContext context) {
@@ -198,18 +192,17 @@ class _ReviewListTab extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
       itemBuilder: (context, index) {
         final order = filtered[index];
-        final item = order.items.isNotEmpty ? order.items.first : null;
-        final daysLeft = _calcDaysLeft(order.orderDate);
-        final reward = 200 + (item != null ? (item.quantity * 50) : 0);
+        final isReviewed = order.isReviewed;
+        final actionLabel = isReviewed
+            ? 'S\u1eeda \u0111\u00e1nh gi\u00e1'
+            : '\u0110\u00e1nh gi\u00e1';
+        final actionIcon = isReviewed ? Icons.edit_outlined : null;
         return _ReviewEntryCard(
-          orderId: order.id,
-          storeName: 'Shop #${order.id}',
-          productTitle: item?.bookTitle ?? 'Sản phẩm',
-          imageUrl: item?.bookImageUrl ?? '',
-          countdownLabel: showCountdown
-              ? '$countdownLabel $daysLeft ngày để đánh giá'
-              : countdownLabel,
-          rewardLabel: 'Đánh giá +$reward',
+          key: ValueKey('review-entry-${order.id}'),
+          storeName: 'M\u00e3 \u0111\u01a1n: ${order.id}',
+          items: order.items,
+          actionLabel: actionLabel,
+          actionIcon: actionIcon,
           onReview: onReview,
           order: order,
         );
@@ -218,38 +211,108 @@ class _ReviewListTab extends StatelessWidget {
       itemCount: filtered.length,
     );
   }
-
-  int _calcDaysLeft(DateTime? date) {
-    if (date == null) return 0;
-    final elapsed = DateTime.now().difference(date).inDays;
-    final left = 30 - elapsed;
-    return left > 0 ? left : 0;
-  }
 }
 
-class _ReviewEntryCard extends StatelessWidget {
+class _ReviewEntryCard extends StatefulWidget {
   const _ReviewEntryCard({
-    required this.orderId,
+    super.key,
     required this.storeName,
-    required this.productTitle,
-    required this.imageUrl,
-    required this.countdownLabel,
-    required this.rewardLabel,
+    required this.items,
+    required this.actionLabel,
+    this.actionIcon,
     this.onReview,
     this.order,
   });
 
-  final int orderId;
   final String storeName;
-  final String productTitle;
-  final String imageUrl;
-  final String countdownLabel;
-  final String rewardLabel;
+  final List<OrderItemSummary> items;
+  final String actionLabel;
+  final IconData? actionIcon;
   final ValueChanged<OrderSummary>? onReview;
   final OrderSummary? order;
 
   @override
+  State<_ReviewEntryCard> createState() => _ReviewEntryCardState();
+}
+
+class _ReviewEntryCardState extends State<_ReviewEntryCard> {
+  bool _expanded = false;
+
+  int _uniqueBookCount(List<OrderItemSummary> items) {
+    final ids = <int>{};
+    for (final item in items) {
+      ids.add(item.bookId);
+    }
+    return ids.length;
+  }
+
+  Widget _buildItemRow(
+    BuildContext context, {
+    required String title,
+    required String author,
+    required String imageUrl,
+  }) {
+    final textTheme = Theme.of(context).textTheme;
+    return Row(
+      children: [
+        Container(
+          width: 60,
+          height: 60,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.gray200),
+            color: AppColors.gray100,
+          ),
+          clipBehavior: Clip.antiAlias,
+          child: imageUrl.isNotEmpty
+              ? Image.network(
+                  imageUrl,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.image_outlined,
+                    color: AppColors.gray500,
+                  ),
+                )
+              : const Icon(
+                  Icons.image_outlined,
+                  color: AppColors.gray500,
+                ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                author,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.bodySmall?.copyWith(
+                  color: AppColors.gray600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final items = widget.items;
+    final hasMore = _uniqueBookCount(items) > 1;
+    final shouldCollapse = hasMore && !_expanded;
+    final visibleItems = shouldCollapse ? items.take(1).toList() : items;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -267,76 +330,91 @@ class _ReviewEntryCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            storeName,
+            widget.storeName,
             style: Theme.of(context)
                 .textTheme
                 .labelSmall
                 ?.copyWith(color: AppColors.gray700),
           ),
           const SizedBox(height: 6),
-          Row(
-            children: [
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.gray200),
-                  color: AppColors.gray100,
-                ),
-                clipBehavior: Clip.antiAlias,
-                child: imageUrl.isNotEmpty
-                    ? Image.network(
-                        imageUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const Icon(
-                          Icons.image_outlined,
-                          color: AppColors.gray500,
-                        ),
-                      )
-                    : const Icon(
-                        Icons.image_outlined,
-                        color: AppColors.gray500,
-                      ),
+          if (visibleItems.isEmpty)
+            _buildItemRow(
+              context,
+              title: 'S\u1ea3n ph\u1ea9m',
+              author: '\u0110ang c\u1eadp nh\u1eadt',
+              imageUrl: '',
+            )
+          else
+            for (var i = 0; i < visibleItems.length; i++) ...[
+              _buildItemRow(
+                context,
+                title: visibleItems[i].bookTitle.isNotEmpty
+                    ? visibleItems[i].bookTitle
+                    : 'S\u1ea3n ph\u1ea9m',
+                author: visibleItems[i].bookAuthor.trim().isNotEmpty
+                    ? visibleItems[i].bookAuthor.trim()
+                    : '\u0110ang c\u1eadp nh\u1eadt',
+                imageUrl: visibleItems[i].bookImageUrl,
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  productTitle,
-                  maxLines: 3,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-              ),
+              if (i < visibleItems.length - 1)
+                const SizedBox(height: 10),
             ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            countdownLabel,
-            style: Theme.of(context)
-                .textTheme
-                .labelSmall
-                ?.copyWith(color: AppColors.gray600),
-          ),
+          if (hasMore) ...[
+            const SizedBox(height: 6),
+            Center(
+              child: TextButton.icon(
+                onPressed: () => setState(() => _expanded = !_expanded),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(0, 0),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  foregroundColor: AppColors.gray600,
+                  textStyle: const TextStyle(fontSize: 10),
+                ),
+                icon: Icon(
+                  _expanded ? Icons.expand_less : Icons.expand_more,
+                  size: 14,
+                ),
+                label: Text(
+                  _expanded ? 'Thu g\u1ecdn' : 'Xem th\u00eam',
+                ),
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           Row(
             children: [
               Expanded(
-                child: ElevatedButton(
-                  onPressed: order != null && onReview != null
-                      ? () => onReview!(order!)
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.orange600,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: Text(rewardLabel),
-                ),
+                child: widget.actionIcon != null
+                    ? ElevatedButton.icon(
+                        onPressed:
+                            widget.order != null && widget.onReview != null
+                                ? () => widget.onReview!(widget.order!)
+                                : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.orange600,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        icon: Icon(widget.actionIcon, size: 18),
+                        label: Text(widget.actionLabel),
+                      )
+                    : ElevatedButton(
+                        onPressed:
+                            widget.order != null && widget.onReview != null
+                                ? () => widget.onReview!(widget.order!)
+                                : null,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.orange600,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        child: Text(widget.actionLabel),
+                      ),
               ),
             ],
           ),

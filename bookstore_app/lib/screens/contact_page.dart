@@ -10,7 +10,7 @@ class ContactPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        const HeaderBar(title: 'Liên hệ'),
+        const HeaderBar(title: 'Li\u00ean h\u1ec7'),
         Expanded(
           child: ListView(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -32,7 +32,7 @@ class ContactPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Cần hỗ trợ?',
+                      'C\u1ea7n h\u1ed7 tr\u1ee3?',
                       style: Theme.of(context)
                           .textTheme
                           .titleMedium
@@ -40,7 +40,7 @@ class ContactPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Đội ngũ hỗ trợ luôn sẵn sàng giúp bạn.',
+                      'D\u1ed9i ng\u0169 h\u1ed7 tr\u1ee3 lu\u00f4n s\u1eb5n s\u00e0ng gi\u00fap b\u1ea1n.',
                       style: Theme.of(context)
                           .textTheme
                           .bodyMedium
@@ -61,8 +61,8 @@ class ContactPage extends StatelessWidget {
                     const SizedBox(height: 12),
                     _ContactTile(
                       icon: Icons.location_on_outlined,
-                      title: 'Cửa hàng',
-                      subtitle: '120 Nguyễn Huệ, Quận 1, TP.HCM',
+                      title: 'C\u1eeda h\u00e0ng',
+                      subtitle: '120 Nguy\u1ec5n Hu\u1ec7, Qu\u1eadn 1, TP.HCM',
                     ),
                   ],
                 ),
@@ -79,7 +79,7 @@ class ContactPage extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Giờ làm việc',
+                      'Gi\u1edd l\u00e0m vi\u1ec7c',
                       style: Theme.of(context)
                           .textTheme
                           .titleMedium
@@ -87,7 +87,7 @@ class ContactPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Thứ 2 - Thứ 7: 08:00 - 20:00',
+                      'Th\u1ee9 2 - Th\u1ee9 7: 08:00 - 20:00',
                       style: Theme.of(context)
                           .textTheme
                           .bodyMedium
@@ -95,7 +95,7 @@ class ContactPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      'Chủ nhật: 09:00 - 18:00',
+                      'Ch\u1ee7 nh\u1eadt: 09:00 - 18:00',
                       style: Theme.of(context)
                           .textTheme
                           .bodyMedium

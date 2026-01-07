@@ -5,5 +5,6 @@ const router = Router();
 
 router.get('/', reviewController.listReviews);
 router.post('/', reviewController.createReview);
+router.put('/:id', reviewController.updateReview);
 
 module.exports = router;
