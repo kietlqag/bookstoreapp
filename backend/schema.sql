@@ -265,6 +265,29 @@ CREATE TABLE IF NOT EXISTS "SupportRequest" (
     FOREIGN KEY ("orderId") REFERENCES "Order"(id) ON DELETE SET NULL
 );
 
+CREATE TABLE IF NOT EXISTS "Notification" (
+  id SERIAL PRIMARY KEY,
+  "userId" INTEGER NOT NULL,
+  type VARCHAR(50) NOT NULL,
+  title VARCHAR(255) NOT NULL,
+  message TEXT NOT NULL,
+  "isRead" BOOLEAN NOT NULL DEFAULT false,
+  "relatedId" INTEGER,
+  "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_notification_user
+    FOREIGN KEY ("userId") REFERENCES "User"(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS "idx_notification_user"
+  ON "Notification" ("userId");
+
+CREATE INDEX IF NOT EXISTS "idx_notification_user_read"
+  ON "Notification" ("userId", "isRead");
+
+CREATE INDEX IF NOT EXISTS "idx_notification_created"
+  ON "Notification" ("createdAt" DESC);
+
 CREATE TABLE IF NOT EXISTS "SupportMessage" (
   id SERIAL PRIMARY KEY,
   "userId" INTEGER NOT NULL,

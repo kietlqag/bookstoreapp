@@ -1,75 +1,87 @@
 import 'package:flutter/material.dart';
 
+import '../models/notification_service.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/header.dart';
 import 'notification_detail_page.dart';
 
 class NotificationListPage extends StatefulWidget {
-  const NotificationListPage({super.key});
+  const NotificationListPage({
+    super.key,
+    required this.baseUrl,
+    required this.token,
+  });
+
+  final String baseUrl;
+  final String token;
 
   @override
   State<NotificationListPage> createState() => _NotificationListPageState();
 }
 
 class _NotificationListPageState extends State<NotificationListPage> {
-  // TODO: Replace with actual notification data from API
-  final List<NotificationItem> _notifications = [
-    NotificationItem(
-      id: '1',
-      title: 'Đơn hàng đã được xác nhận',
-      message: 'Đơn hàng #12345 của bạn đã được xác nhận và đang được chuẩn bị.',
-      time: DateTime.now().subtract(const Duration(minutes: 10)),
-      isRead: false,
-      type: NotificationType.order,
-    ),
-    NotificationItem(
-      id: '2',
-      title: 'Khuyến mãi đặc biệt',
-      message: 'Giảm 20% cho tất cả sách văn học trong tuần này!',
-      time: DateTime.now().subtract(const Duration(hours: 2)),
-      isRead: false,
-      type: NotificationType.promotion,
-    ),
-    NotificationItem(
-      id: '3',
-      title: 'Đơn hàng đang được giao',
-      message: 'Đơn hàng #12340 của bạn đang trên đường giao đến bạn.',
-      time: DateTime.now().subtract(const Duration(days: 1)),
-      isRead: true,
-      type: NotificationType.order,
-    ),
-    NotificationItem(
-      id: '4',
-      title: 'Sách yêu thích đã có hàng',
-      message: '"Sách ABC" trong danh sách yêu thích của bạn đã có hàng trở lại.',
-      time: DateTime.now().subtract(const Duration(days: 2)),
-      isRead: true,
-      type: NotificationType.product,
-    ),
-  ];
+  late final NotificationService _notificationService =
+      NotificationService(baseUrl: widget.baseUrl, token: widget.token);
 
-  void _markAllAsRead() {
+  List<NotificationItem> _notifications = [];
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotifications();
+  }
+
+  Future<void> _loadNotifications() async {
     setState(() {
-      for (int i = 0; i < _notifications.length; i++) {
-        if (!_notifications[i].isRead) {
-          _notifications[i] = NotificationItem(
-            id: _notifications[i].id,
-            title: _notifications[i].title,
-            message: _notifications[i].message,
-            time: _notifications[i].time,
-            isRead: true,
-            type: _notifications[i].type,
-          );
-        }
-      }
+      _loading = true;
+      _error = null;
     });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Đã đánh dấu tất cả thông báo là đã đọc'),
-        duration: Duration(seconds: 2),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+
+    try {
+      final notifications = await _notificationService.getNotifications(includeRead: true);
+      if (!mounted) return;
+      setState(() {
+        _notifications = notifications;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _error = error.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _refreshNotifications() async {
+    await _loadNotifications();
+  }
+
+  Future<void> _markAllAsRead() async {
+    try {
+      await _notificationService.markAllAsRead();
+      if (!mounted) return;
+      await _loadNotifications(); // Reload để cập nhật UI
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Đã đánh dấu tất cả thông báo là đã đọc'),
+          duration: Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi: ${error.toString()}'),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   @override
@@ -93,19 +105,63 @@ class _NotificationListPageState extends State<NotificationListPage> {
               ),
               titleColor: Colors.white,
               iconColor: Colors.white,
-              actions: const [], // Bỏ icon chuông và tim
+              actions: [
+                // Mark all as read button
+                if (_notifications.any((n) => !n.isRead))
+                  TextButton(
+                    onPressed: _markAllAsRead,
+                    child: const Text(
+                      'Đọc tất cả',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             Expanded(
-              child: _notifications.isEmpty
-                  ? _buildEmptyState()
-                  : ListView.builder(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _notifications.length,
-                      itemBuilder: (context, index) {
-                        final notification = _notifications[index];
-                        return _buildNotificationCard(notification);
-                      },
-                    ),
+              child: _loading
+                  ? const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          AppColors.orange600,
+                        ),
+                      ),
+                    )
+                  : _error != null
+                      ? Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                _error!,
+                                style: const TextStyle(color: Colors.red),
+                                textAlign: TextAlign.center,
+                              ),
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: _loadNotifications,
+                                child: const Text('Thử lại'),
+                              ),
+                            ],
+                          ),
+                        )
+                      : _notifications.isEmpty
+                          ? _buildEmptyState()
+                          : RefreshIndicator(
+                              onRefresh: _refreshNotifications,
+                              color: AppColors.orange600,
+                              child: ListView.builder(
+                                padding: const EdgeInsets.all(16),
+                                itemCount: _notifications.length,
+                                itemBuilder: (context, index) {
+                                  final notification = _notifications[index];
+                                  return _buildNotificationCard(notification);
+                                },
+                              ),
+                            ),
             ),
           ],
         ),
@@ -147,7 +203,7 @@ class _NotificationListPageState extends State<NotificationListPage> {
     IconData icon;
     Color iconColor;
     
-    switch (notification.type) {
+    switch (notification.notificationType) {
       case NotificationType.order:
         icon = Icons.local_shipping_outlined;
         iconColor = AppColors.orange600;
@@ -171,26 +227,13 @@ class _NotificationListPageState extends State<NotificationListPage> {
           MaterialPageRoute(
             builder: (context) => NotificationDetailPage(
               notification: notification,
-              onMarkAsRead: () {
-                setState(() {
-                  // Update notification status in list
-                  final index = _notifications.indexWhere((n) => n.id == notification.id);
-                  if (index != -1) {
-                    _notifications[index] = NotificationItem(
-                      id: notification.id,
-                      title: notification.title,
-                      message: notification.message,
-                      time: notification.time,
-                      isRead: true,
-                      type: notification.type,
-                    );
-                  }
-                });
+              baseUrl: widget.baseUrl,
+              token: widget.token,
+              onMarkAsRead: () async {
+                await _loadNotifications(); // Reload để cập nhật UI
               },
-              onDelete: () {
-                setState(() {
-                  _notifications.removeWhere((n) => n.id == notification.id);
-                });
+              onDelete: () async {
+                await _loadNotifications(); // Reload để cập nhật UI
               },
             ),
           ),
@@ -273,7 +316,7 @@ class _NotificationListPageState extends State<NotificationListPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _formatTime(notification.time),
+                  _formatTime(notification.createdAt),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppColors.gray500,
                         fontSize: 11,
@@ -306,27 +349,3 @@ class _NotificationListPageState extends State<NotificationListPage> {
   }
 }
 
-enum NotificationType {
-  order,
-  promotion,
-  product,
-  system,
-}
-
-class NotificationItem {
-  const NotificationItem({
-    required this.id,
-    required this.title,
-    required this.message,
-    required this.time,
-    required this.isRead,
-    required this.type,
-  });
-
-  final String id;
-  final String title;
-  final String message;
-  final DateTime time;
-  final bool isRead;
-  final NotificationType type;
-}

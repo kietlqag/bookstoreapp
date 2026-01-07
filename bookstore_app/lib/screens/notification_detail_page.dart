@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
 
+import '../models/notification_service.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/header.dart';
-import 'notification_list_page.dart';
 
 class NotificationDetailPage extends StatefulWidget {
   const NotificationDetailPage({
     super.key,
     required this.notification,
+    required this.baseUrl,
+    required this.token,
     this.onMarkAsRead,
     this.onDelete,
   });
 
   final NotificationItem notification;
+  final String baseUrl;
+  final String token;
   final VoidCallback? onMarkAsRead;
   final VoidCallback? onDelete;
 
@@ -29,25 +33,43 @@ class _NotificationDetailPageState extends State<NotificationDetailPage> {
     _isRead = widget.notification.isRead;
   }
 
-  void _handleMarkAsRead() {
+  Future<void> _handleMarkAsRead() async {
     if (!_isRead) {
-      setState(() {
-        _isRead = true;
-      });
-      if (widget.onMarkAsRead != null) {
-        widget.onMarkAsRead!();
+      try {
+        final service = NotificationService(
+          baseUrl: widget.baseUrl,
+          token: widget.token,
+        );
+        await service.markAsRead(widget.notification.id);
+        if (!mounted) return;
+        setState(() {
+          _isRead = true;
+        });
+        if (widget.onMarkAsRead != null) {
+          widget.onMarkAsRead!();
+        }
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Đã đánh dấu là đã đọc'),
+            duration: Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      } catch (error) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi: ${error.toString()}'),
+            duration: const Duration(seconds: 2),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đã đánh dấu là đã đọc'),
-          duration: Duration(seconds: 2),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
     }
   }
 
-  void _handleDelete() {
+  Future<void> _handleDelete() async {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -59,19 +81,37 @@ class _NotificationDetailPageState extends State<NotificationDetailPage> {
             child: const Text('Hủy'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(context).pop();
-              if (widget.onDelete != null) {
-                widget.onDelete!();
+              try {
+                final service = NotificationService(
+                  baseUrl: widget.baseUrl,
+                  token: widget.token,
+                );
+                await service.deleteNotification(widget.notification.id);
+                if (!mounted) return;
+                if (widget.onDelete != null) {
+                  widget.onDelete!();
+                }
+                Navigator.of(context).pop();
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Đã xóa thông báo'),
+                    duration: Duration(seconds: 2),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              } catch (error) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Lỗi: ${error.toString()}'),
+                    duration: const Duration(seconds: 2),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
               }
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Đã xóa thông báo'),
-                  duration: Duration(seconds: 2),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
             },
             child: const Text(
               'Xóa',
@@ -128,8 +168,8 @@ class _NotificationDetailPageState extends State<NotificationDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final icon = _getIcon(widget.notification.type);
-    final iconColor = _getIconColor(widget.notification.type);
+    final icon = _getIcon(widget.notification.notificationType);
+    final iconColor = _getIconColor(widget.notification.notificationType);
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -191,7 +231,7 @@ class _NotificationDetailPageState extends State<NotificationDetailPage> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                _formatTime(widget.notification.time),
+                                _formatTime(widget.notification.createdAt),
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodySmall

@@ -6,6 +6,7 @@ import 'dart:async';
 import '../models/book.dart';
 import '../models/cart_item.dart';
 import '../models/category_service.dart';
+import '../models/notification_service.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/bottom_nav.dart';
 import '../widgets/book_card.dart';
@@ -40,6 +41,7 @@ class HomePage extends StatefulWidget {
     required this.onToggleFavorite,
     required this.onLogout,
     required this.userId,
+    required this.token,
   });
 
   static final ValueNotifier<String> tabNotifier =
@@ -61,6 +63,7 @@ class HomePage extends StatefulWidget {
   final Future<bool> Function(Book book) onToggleFavorite;
   final VoidCallback onLogout;
   final int userId;
+  final String token;
 
   @override
   State<HomePage> createState() => _HomePageState();
@@ -120,12 +123,16 @@ class _HomePageState extends State<HomePage> {
         onOpenBook: widget.onOpenBook,
         onOpenSearch: () => _handleTabChange('search'),
         onToggleFavorite: widget.onToggleFavorite,
+        baseUrl: _resolveBaseUrl(),
+        token: widget.token,
       ),
       'search': SearchPage(
         books: widget.books,
         favoriteIds: widget.favoriteIds,
         onOpenBook: widget.onOpenBook,
         onToggleFavorite: widget.onToggleFavorite,
+        baseUrl: _resolveBaseUrl(),
+        token: widget.token,
       ),
       'cart': CartPage(
         cartItems: widget.cartItems,
@@ -177,6 +184,8 @@ class _HomeTab extends StatefulWidget {
     required this.onOpenBook,
     required this.onOpenSearch,
     required this.onToggleFavorite,
+    required this.baseUrl,
+    required this.token,
   });
 
   final List<Book> books;
@@ -185,6 +194,8 @@ class _HomeTab extends StatefulWidget {
   final ValueChanged<Book> onOpenBook;
   final VoidCallback onOpenSearch;
   final Future<bool> Function(Book book) onToggleFavorite;
+  final String baseUrl;
+  final String token;
 
   @override
   State<_HomeTab> createState() => _HomeTabState();
@@ -201,6 +212,9 @@ class _HomeTabState extends State<_HomeTab> {
   Timer? _flashTimer;
   Timer? _countdownTimer;
   Duration _timeLeft = const Duration();
+  late final NotificationService _notificationService =
+      NotificationService(baseUrl: widget.baseUrl, token: widget.token);
+  int _unreadNotificationCount = 0;
 
   Future<void> _handleFavorite(Book book) async {
     try {
@@ -236,6 +250,7 @@ class _HomeTabState extends State<_HomeTab> {
   void initState() {
     super.initState();
     _loadCategories();
+    _loadUnreadNotificationCount();
     _flashEndsAt = DateTime.now().add(const Duration(hours: 5, minutes: 30));
     _timeLeft = _flashEndsAt.difference(DateTime.now());
     _flashTimer = Timer.periodic(const Duration(seconds: 4), (_) {
@@ -255,6 +270,18 @@ class _HomeTabState extends State<_HomeTab> {
         _timeLeft = remaining.isNegative ? Duration.zero : remaining;
       });
     });
+  }
+
+  Future<void> _loadUnreadNotificationCount() async {
+    try {
+      final count = await _notificationService.getUnreadCount();
+      if (!mounted) return;
+      setState(() {
+        _unreadNotificationCount = count;
+      });
+    } catch (_) {
+      // Ignore errors, keep count at 0
+    }
   }
 
   Future<void> _loadCategories() async {
@@ -334,12 +361,18 @@ class _HomeTabState extends State<_HomeTab> {
               ),
             );
           },
-          onNotificationTap: () {
-            Navigator.of(context).push(
+          notificationCount: _unreadNotificationCount,
+          onNotificationTap: () async {
+            await Navigator.of(context).push(
               MaterialPageRoute(
-                builder: (_) => const NotificationListPage(),
+                builder: (_) => NotificationListPage(
+                  baseUrl: widget.baseUrl,
+                  token: widget.token,
+                ),
               ),
             );
+            // Reload count when returning from notification page
+            _loadUnreadNotificationCount();
           },
         ),
         Expanded(

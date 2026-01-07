@@ -16,6 +16,7 @@ const voucherRoutes = require('./voucher.routes');
 const shippingMethodRoutes = require('./shipping_method.routes');
 const supportRoutes = require('./support.routes');
 const chatRoutes = require('./chat.routes');
+const notificationRoutes = require('./notification.routes');
 
 const router = Router();
 
@@ -35,5 +36,6 @@ router.use('/vouchers', voucherRoutes);
 router.use('/shipping-methods', shippingMethodRoutes);
 router.use('/support', supportRoutes);
 router.use('/chat', chatRoutes);
+router.use('/notifications', notificationRoutes);
 
 module.exports = router;

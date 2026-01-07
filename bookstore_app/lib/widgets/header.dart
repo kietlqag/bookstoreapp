@@ -11,6 +11,7 @@ class HeaderBar extends StatelessWidget {
     this.actions,
     this.onFavoriteTap,
     this.onNotificationTap,
+    this.notificationCount,
     this.favoriteCount,
     this.backgroundGradient,
     this.backgroundColor,
@@ -33,6 +34,7 @@ class HeaderBar extends StatelessWidget {
   final List<Widget>? actions;
   final VoidCallback? onFavoriteTap;
   final VoidCallback? onNotificationTap;
+  final int? notificationCount;
   final int? favoriteCount;
   final Gradient? backgroundGradient;
   final Color? backgroundColor;
@@ -112,6 +114,7 @@ class HeaderBar extends StatelessWidget {
               children: [
                 _NotificationButton(
                   iconColor: iconColor,
+                  count: notificationCount ?? 0,
                   onPressed: onNotificationTap,
                 ),
                 SizedBox(width: 6),
@@ -164,10 +167,12 @@ class _IconButton extends StatelessWidget {
 class _NotificationButton extends StatelessWidget {
   const _NotificationButton({
     this.iconColor,
+    this.count = 0,
     this.onPressed,
   });
 
   final Color? iconColor;
+  final int count;
   final VoidCallback? onPressed;
 
   @override
@@ -180,18 +185,41 @@ class _NotificationButton extends StatelessWidget {
           iconColor: iconColor,
           onPressed: onPressed,
         ),
-        Positioned(
-          right: 4,
-          top: 4,
-          child: Container(
-            width: 8,
-            height: 8,
-            decoration: const BoxDecoration(
-              color: Colors.red,
-              shape: BoxShape.circle,
+        if (count > 0)
+          Positioned(
+            right: 2,
+            top: 1,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 0.5),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(7),
+              ),
+              constraints: const BoxConstraints(minWidth: 12),
+              child: Text(
+                count > 99 ? '99+' : count.toString(),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: AppColors.orange600,
+                  fontSize: 8,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          )
+        else
+          Positioned(
+            right: 4,
+            top: 4,
+            child: Container(
+              width: 8,
+              height: 8,
+              decoration: const BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
             ),
           ),
-        ),
       ],
     );
   }

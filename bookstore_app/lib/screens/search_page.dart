@@ -2,6 +2,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/book.dart';
+import '../models/notification_service.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/book_card.dart';
 import '../widgets/category_chip.dart';
@@ -18,12 +19,16 @@ class SearchPage extends StatefulWidget {
     required this.favoriteIds,
     required this.onOpenBook,
     required this.onToggleFavorite,
+    required this.baseUrl,
+    required this.token,
   });
 
   final List<Book> books;
   final Set<int> favoriteIds;
   final ValueChanged<Book> onOpenBook;
   final Future<bool> Function(Book book) onToggleFavorite;
+  final String baseUrl;
+  final String token;
 
   @override
   State<SearchPage> createState() => _SearchPageState();
@@ -35,11 +40,27 @@ class _SearchPageState extends State<SearchPage> {
   String _selectedCategory = 'Tất cả';
   static const int _maxRecentSearches = 8;
   static const String _recentSearchesKey = 'recent_searches';
+  late final NotificationService _notificationService =
+      NotificationService(baseUrl: widget.baseUrl, token: widget.token);
+  int _unreadNotificationCount = 0;
 
   @override
   void initState() {
     super.initState();
     _loadRecentSearches();
+    _loadUnreadNotificationCount();
+  }
+
+  Future<void> _loadUnreadNotificationCount() async {
+    try {
+      final count = await _notificationService.getUnreadCount();
+      if (!mounted) return;
+      setState(() {
+        _unreadNotificationCount = count;
+      });
+    } catch (_) {
+      // Ignore errors, keep count at 0
+    }
   }
 
   @override
@@ -149,6 +170,7 @@ class _SearchPageState extends State<SearchPage> {
               ),
               iconColor: Colors.white,
               showDivider: false,
+              favoriteCount: widget.favoriteIds.length,
               titleFlex: 0,
               middleFlex: 7,
               leadingSpacing: 0,
@@ -174,12 +196,18 @@ class _SearchPageState extends State<SearchPage> {
                   ),
                 );
               },
-              onNotificationTap: () {
-                Navigator.of(context).push(
+              notificationCount: _unreadNotificationCount,
+              onNotificationTap: () async {
+                await Navigator.of(context).push(
                   MaterialPageRoute(
-                    builder: (_) => const NotificationListPage(),
+                    builder: (_) => NotificationListPage(
+                      baseUrl: widget.baseUrl,
+                      token: widget.token,
+                    ),
                   ),
                 );
+                // Reload count when returning from notification page
+                _loadUnreadNotificationCount();
               },
             ),
             Expanded(

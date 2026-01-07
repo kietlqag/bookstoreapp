@@ -400,6 +400,7 @@ class _BookStoreAppState extends State<BookStoreApp> {
           onToggleFavorite: _toggleFavorite,
           onLogout: _logout,
           userId: session.userId,
+          token: session.token,
         ),
       ),
       (route) => false,
@@ -703,6 +704,7 @@ class _BookStoreAppState extends State<BookStoreApp> {
               onToggleFavorite: _toggleFavorite,
               onLogout: _logout,
               userId: _session?.userId ?? 0,
+              token: _session?.token ?? '',
             )
           : (_hasSeenWelcome
               ? LoginPage(
