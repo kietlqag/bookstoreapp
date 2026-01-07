@@ -9,6 +9,7 @@ import '../widgets/header.dart';
 import '../widgets/search_bar.dart';
 import '../widgets/top_message.dart';
 import 'favorites_page.dart';
+import 'notification_list_page.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({
@@ -170,6 +171,13 @@ class _SearchPageState extends State<SearchPage> {
                       onOpenBook: widget.onOpenBook,
                       onToggleFavorite: widget.onToggleFavorite,
                     ),
+                  ),
+                );
+              },
+              onNotificationTap: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => const NotificationListPage(),
                   ),
                 );
               },

@@ -480,6 +480,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
           response.qrImageUrl!.isNotEmpty) {
         await showModalBottomSheet<void>(
           context: context,
+          isScrollControlled: true,
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
           ),
@@ -1467,62 +1468,69 @@ class _QrSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            'Qu\u00e9t m\u00e3 VietQR',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.gray200),
-            ),
-            child: Image.network(
-              qrImageUrl,
-              height: 220,
-              width: 220,
-              fit: BoxFit.contain,
-              errorBuilder: (_, __, ___) => const Icon(
-                Icons.qr_code_2,
-                size: 120,
-                color: AppColors.gray400,
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.of(context).size.height * 0.9,
+      ),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Qu\u00e9t m\u00e3 VietQR',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
               ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            'S\u1ed1 ti\u1ec1n: ${formatPrice(amount)}',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: AppColors.gray700,
-                  fontWeight: FontWeight.w600,
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.gray200),
                 ),
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: () => Navigator.pop(context),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.orange600,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
+                child: Image.network(
+                  qrImageUrl,
+                  height: 220,
+                  width: 220,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.qr_code_2,
+                    size: 120,
+                    color: AppColors.gray400,
+                  ),
                 ),
               ),
-              child: const Text('T\u00f4i \u0111\u00e3 qu\u00e9t'),
-            ),
+              const SizedBox(height: 12),
+              Text(
+                'S\u1ed1 ti\u1ec1n: ${formatPrice(amount)}',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: AppColors.gray700,
+                      fontWeight: FontWeight.w600,
+                    ),
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.orange600,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('T\u00f4i \u0111\u00e3 qu\u00e9t'),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }

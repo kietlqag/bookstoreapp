@@ -14,7 +14,17 @@ async function getBook(id) {
   return book;
 }
 
+function searchBooks(query, limit = 5) {
+  return bookRepository.searchBooks(query, limit);
+}
+
+function getPopularBooks(limit = 5) {
+  return bookRepository.getPopularBooks(limit);
+}
+
 module.exports = {
   listBooks,
   getBook,
+  searchBooks,
+  getPopularBooks,
 };

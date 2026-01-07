@@ -4,12 +4,15 @@ import 'package:flutter/material.dart';
 
 import '../models/address.dart';
 import '../models/address_service.dart';
+import '../models/cart_service.dart';
 import '../models/order.dart';
 import '../models/order_service.dart';
 import '../models/review_service.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/price_formatter.dart';
+import '../widgets/top_message.dart';
 import 'address_list_page.dart';
+import 'home_page.dart';
 import 'review_order_page.dart';
 import 'support_request_page.dart';
 
@@ -45,6 +48,8 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
       OrderService(baseUrl: _resolveBaseUrl());
   late final ReviewService _reviewService =
       ReviewService(baseUrl: _resolveBaseUrl());
+  late final CartService _cartService =
+      CartService(baseUrl: _resolveBaseUrl());
 
   @override
   void initState() {
@@ -620,7 +625,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
             const SizedBox(width: 12),
             Expanded(
               child: ElevatedButton(
-                onPressed: () => _showMessage('Mua lại sản phẩm.'),
+                onPressed: _handleBuyAgain,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.orange600,
                   foregroundColor: Colors.white,
@@ -715,6 +720,62 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
+  }
+
+  Future<void> _handleBuyAgain() async {
+    if (widget.order.items.isEmpty) {
+      _showMessage('Đơn hàng không có sản phẩm.');
+      return;
+    }
+
+    try {
+      int successCount = 0;
+      // Thêm tất cả sản phẩm vào giỏ hàng
+      for (final item in widget.order.items) {
+        try {
+          await _cartService.addToCart(
+            userId: widget.userId,
+            bookId: item.bookId,
+            quantity: item.quantity,
+          );
+          successCount++;
+        } catch (e) {
+          // Bỏ qua lỗi cho từng sản phẩm, tiếp tục với sản phẩm khác
+          continue;
+        }
+      }
+
+      if (!mounted) return;
+
+      if (successCount == 0) {
+        _showMessage('Không thể thêm sản phẩm vào giỏ hàng.');
+        return;
+      }
+
+      // Hiển thị thông báo trước khi pop
+      final message = successCount == widget.order.items.length
+          ? 'Đã thêm $successCount sản phẩm vào giỏ hàng'
+          : 'Đã thêm $successCount/${widget.order.items.length} sản phẩm vào giỏ hàng';
+
+      // Hiển thị thông báo ngay lập tức
+      if (mounted) {
+        showTopMessage(
+          context,
+          message: message,
+          type: TopMessageType.success,
+        );
+      }
+
+      // Chuyển đến trang giỏ hàng và pop sau một chút để user thấy thông báo
+      Future.delayed(const Duration(milliseconds: 300), () {
+        if (!mounted) return;
+        HomePage.setActiveTab('cart');
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage('Có lỗi xảy ra khi thêm vào giỏ hàng.');
+    }
   }
 
   String _mapStatus(String status) {

@@ -1,4 +1,6 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:io';
+
+import 'package:flutter/material.dart';
 import 'dart:async';
 
 import '../models/book.dart';
@@ -8,6 +10,7 @@ import '../widgets/app_colors.dart';
 import '../widgets/bottom_nav.dart';
 import '../widgets/book_card.dart';
 import '../widgets/category_chip.dart';
+import '../widgets/floating_chat.dart';
 import '../widgets/header.dart';
 import '../widgets/price_formatter.dart';
 import '../widgets/search_bar.dart';
@@ -18,6 +21,7 @@ import 'contact_page.dart';
 import 'best_seller_books_page.dart';
 import 'featured_books_page.dart';
 import 'favorites_page.dart';
+import 'notification_list_page.dart';
 import 'profile_page.dart';
 import 'search_page.dart';
 
@@ -95,6 +99,17 @@ class _HomePageState extends State<HomePage> {
     super.dispose();
   }
 
+  static String _resolveBaseUrl() {
+    const overrideUrl = String.fromEnvironment('API_BASE_URL');
+    if (overrideUrl.isNotEmpty) {
+      return overrideUrl;
+    }
+    if (Platform.isAndroid) {
+      return 'http://192.168.1.4:8080';
+    }
+    return 'http://localhost:8080';
+  }
+
   @override
   Widget build(BuildContext context) {
     final pages = {
@@ -130,11 +145,20 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       backgroundColor: Colors.white,
-      body: SafeArea(
-        child: IndexedStack(
-          index: pages.keys.toList().indexOf(_activeTab),
-          children: pages.values.toList(),
-        ),
+      body: Stack(
+        children: [
+          SafeArea(
+            child: IndexedStack(
+              index: pages.keys.toList().indexOf(_activeTab),
+              children: pages.values.toList(),
+            ),
+          ),
+          // Floating Chat Widget
+          FloatingChatWidget(
+            baseUrl: _resolveBaseUrl(),
+            onOpenBook: widget.onOpenBook,
+          ),
+        ],
       ),
       bottomNavigationBar: BottomNav(
         activeTab: _activeTab,
@@ -307,6 +331,13 @@ class _HomeTabState extends State<_HomeTab> {
                   onOpenBook: widget.onOpenBook,
                   onToggleFavorite: widget.onToggleFavorite,
                 ),
+              ),
+            );
+          },
+          onNotificationTap: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) => const NotificationListPage(),
               ),
             );
           },

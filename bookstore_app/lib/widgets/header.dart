@@ -10,6 +10,7 @@ class HeaderBar extends StatelessWidget {
     this.onBack,
     this.actions,
     this.onFavoriteTap,
+    this.onNotificationTap,
     this.favoriteCount,
     this.backgroundGradient,
     this.backgroundColor,
@@ -31,6 +32,7 @@ class HeaderBar extends StatelessWidget {
   final VoidCallback? onBack;
   final List<Widget>? actions;
   final VoidCallback? onFavoriteTap;
+  final VoidCallback? onNotificationTap;
   final int? favoriteCount;
   final Gradient? backgroundGradient;
   final Color? backgroundColor;
@@ -108,7 +110,10 @@ class HeaderBar extends StatelessWidget {
             const Spacer(),
             Row(
               children: [
-                _NotificationButton(iconColor: iconColor),
+                _NotificationButton(
+                  iconColor: iconColor,
+                  onPressed: onNotificationTap,
+                ),
                 SizedBox(width: 6),
                 _FavoriteButton(
                   iconColor: iconColor,
@@ -159,9 +164,11 @@ class _IconButton extends StatelessWidget {
 class _NotificationButton extends StatelessWidget {
   const _NotificationButton({
     this.iconColor,
+    this.onPressed,
   });
 
   final Color? iconColor;
+  final VoidCallback? onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -171,6 +178,7 @@ class _NotificationButton extends StatelessWidget {
         _IconButton(
           icon: Icons.notifications_none,
           iconColor: iconColor,
+          onPressed: onPressed,
         ),
         Positioned(
           right: 4,
