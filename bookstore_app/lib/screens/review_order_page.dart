@@ -188,7 +188,7 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
   Future<void> _submitReview() async {
     final selectedItem = _selectedItem;
     if (selectedItem == null) {
-    _showMessage('Kh\u00f4ng c\u00f3 s\u1ea3n ph\u1ea5m \u0111\u1ec3 \u0111\u00e1nh gi\u00e1.');
+    _showMessage('Kh\u00f4ng c\u00f3 s\u1ea3n ph\u1ea9m \u0111\u1ec3 \u0111\u00e1nh gi\u00e1.');
       return;
     }
     final draft = _ensureDraftForSelected();
@@ -279,7 +279,7 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
       _showMessage(
         'Da gui danh gia. Con ' +
             remaining.toString() +
-            ' s\u1ea3n ph\u1ea5m ch\u01b0a \u0111\u00e1nh gi\u00e1.',
+            ' s\u1ea3n ph\u1ea9m ch\u01b0a \u0111\u00e1nh gi\u00e1.',
       );
     } catch (error) {
       _showMessage(error.toString());
@@ -413,7 +413,7 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(false),
         ),
-        title: const Text('\u0110\u00e1nh gi\u00e1 s\u1ea3n ph\u1ea5m'),
+        title: const Text('\u0110\u00e1nh gi\u00e1 s\u1ea3n ph\u1ea9m'),
         centerTitle: false,
         toolbarHeight: 44,
         elevation: 0,
@@ -452,7 +452,7 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
                       if (hasProducts) ...[
                         if (_pendingItems.length > 1) ...[
                           Text(
-                            'Ch\u1ecdn s\u1ea3n ph\u1ea5m mu\u1ed1n \u0111\u00e1nh gi\u00e1',
+                            'Ch\u1ecdn s\u1ea3n ph\u1ea9m mu\u1ed1n \u0111\u00e1nh gi\u00e1',
                             style: Theme.of(context)
                                 .textTheme
                                 .labelSmall
@@ -482,7 +482,7 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
                         const SizedBox(height: 6),
                       ] else ...[
                         Text(
-                          '\u0110\u00e3 \u0111\u00e1nh gi\u00e1 h\u1ebft s\u1ea3n ph\u1ea5m trong \u0111\u01a1n.',
+                          '\u0110\u00e3 \u0111\u00e1nh gi\u00e1 h\u1ebft s\u1ea3n ph\u1ea9m trong \u0111\u01a1n.',
                           style: Theme.of(context)
                               .textTheme
                               .bodySmall
@@ -493,7 +493,7 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
                       if (hasProducts) ...[
                         const Divider(height: 24, color: AppColors.gray200),
                         Text(
-                          '\u0110\u00e1nh gi\u00e1 s\u1ea3n ph\u1ea5m',
+                          '\u0110\u00e1nh gi\u00e1 s\u1ea3n ph\u1ea9m',
                           style: Theme.of(context)
                               .textTheme
                               .bodyMedium
@@ -514,7 +514,7 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
                         ),
                         const SizedBox(height: 16),
                         Text(
-                            'Th\u00eam \u00edt nh\u1ea5t 1 h\u00ecnh \u1ea3nh/video v\u1ec1 s\u1ea3n ph\u1ea5m',
+                            'Th\u00eam \u00edt nh\u1ea5t 1 h\u00ecnh \u1ea3nh/video v\u1ec1 s\u1ea3n ph\u1ea9m',
                           style: Theme.of(context)
                               .textTheme
                               .labelSmall
@@ -557,6 +557,10 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
                         TextField(
                           controller: _commentController,
                           maxLines: 5,
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(fontSize: 13),
                           onChanged: (value) {
                             final draft = _ensureDraftForSelected();
                             if (draft == null) return;
@@ -567,7 +571,7 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
                           },
                           decoration: InputDecoration(
                             hintText:
-                            'H\u00e3y chia s\u1ebb nh\u1eadn x\u00e9t cho s\u1ea3n ph\u1ea5m n\u00e0y nh\u00e9!',
+                            'H\u00e3y chia s\u1ebb nh\u1eadn x\u00e9t cho s\u1ea3n ph\u1ea9m n\u00e0y nh\u00e9!',
                             hintStyle: Theme.of(context)
                                 .textTheme
                                 .bodySmall

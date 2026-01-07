@@ -11,6 +11,7 @@ import '../widgets/app_colors.dart';
 import '../widgets/price_formatter.dart';
 import 'address_list_page.dart';
 import 'review_order_page.dart';
+import 'support_request_page.dart';
 
 class OrderDetailPage extends StatefulWidget {
   const OrderDetailPage({
@@ -202,6 +203,18 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
       _reviewed = true;
     });
     _showMessage('Cảm ơn bạn đã đánh giá.');
+  }
+
+  Future<void> _openSupportRequest() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => SupportRequestPage(
+          userId: widget.userId,
+          orderId: widget.order.id,
+          orderCode: 'Đơn hàng #${widget.order.id}',
+        ),
+      ),
+    );
   }
 
   @override
@@ -500,6 +513,21 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         children: [
           Expanded(
             child: OutlinedButton(
+              onPressed: _openSupportRequest,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.orange600,
+                side: const BorderSide(color: AppColors.orange600),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: const Text('Hỗ trợ'),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: OutlinedButton(
               onPressed: _cancelling ? null : _confirmCancelOrder,
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.orange600,
@@ -517,12 +545,41 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     }
 
     if (status == 'waiting_pickup') {
-      return const SizedBox.shrink();
+      return SizedBox(
+        width: double.infinity,
+        child: OutlinedButton(
+          onPressed: _openSupportRequest,
+          style: OutlinedButton.styleFrom(
+            foregroundColor: AppColors.orange600,
+            side: const BorderSide(color: AppColors.orange600),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+          ),
+          child: const Text('Hỗ trợ'),
+        ),
+      );
     }
 
     if (status == 'shipping') {
       return Row(
         children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: _openSupportRequest,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.orange600,
+                side: const BorderSide(color: AppColors.orange600),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: const Text('Hỗ trợ'),
+            ),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton(
               onPressed: _markingReceived ? null : _markOrderReceived,
@@ -543,41 +600,111 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     }
 
     if (status == 'delivered') {
-      return SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed:
-              _reviewed ? () => _showMessage('Mua lại sản phẩm.') : _openReviewPage,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.orange600,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+      if (_reviewed) {
+        return Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: _openSupportRequest,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.orange600,
+                  side: const BorderSide(color: AppColors.orange600),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: const Text('Hỗ trợ'),
+              ),
             ),
-            padding: const EdgeInsets.symmetric(vertical: 12),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton(
+                onPressed: () => _showMessage('Mua lại sản phẩm.'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.orange600,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+                child: const Text('Mua lại'),
+              ),
+            ),
+          ],
+        );
+      }
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: _openSupportRequest,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.orange600,
+                side: const BorderSide(color: AppColors.orange600),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: const Text('Hỗ trợ'),
+            ),
           ),
-          child: Text(_reviewed ? 'Mua lại' : 'Đánh giá'),
-        ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: _openReviewPage,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.orange600,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: const Text('Đánh giá'),
+            ),
+          ),
+        ],
       );
     }
 
     if (status == 'returning' || status == 'refunding' || status == 'cancelled') {
-      return SizedBox(
-        width: double.infinity,
-        child: ElevatedButton(
-          onPressed: () {
-            _showMessage('Mua lại sản phẩm.');
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.orange600,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
+      return Row(
+        children: [
+          Expanded(
+            child: OutlinedButton(
+              onPressed: _openSupportRequest,
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.orange600,
+                side: const BorderSide(color: AppColors.orange600),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: const Text('Hỗ trợ'),
             ),
-            padding: const EdgeInsets.symmetric(vertical: 12),
           ),
-          child: const Text('Mua lại'),
-        ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton(
+              onPressed: () {
+                _showMessage('Mua lại sản phẩm.');
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.orange600,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 12),
+              ),
+              child: const Text('Mua lại'),
+            ),
+          ),
+        ],
       );
     }
 

@@ -247,6 +247,49 @@ CREATE TABLE IF NOT EXISTS "UserContactOtp" (
     FOREIGN KEY ("userId") REFERENCES "User"(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS "SupportRequest" (
+  id SERIAL PRIMARY KEY,
+  "userId" INTEGER NOT NULL,
+  "orderId" INTEGER,
+  subject TEXT NOT NULL,
+  message TEXT NOT NULL,
+  category TEXT,
+  email TEXT,
+  phone TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+  CONSTRAINT fk_support_request_user
+    FOREIGN KEY ("userId") REFERENCES "User"(id) ON DELETE CASCADE,
+  CONSTRAINT fk_support_request_order
+    FOREIGN KEY ("orderId") REFERENCES "Order"(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS "SupportMessage" (
+  id SERIAL PRIMARY KEY,
+  "userId" INTEGER NOT NULL,
+  "requestId" INTEGER,
+  message TEXT NOT NULL,
+  "isFromUser" BOOLEAN NOT NULL DEFAULT true,
+  "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+  CONSTRAINT fk_support_message_user
+    FOREIGN KEY ("userId") REFERENCES "User"(id) ON DELETE CASCADE,
+  CONSTRAINT fk_support_message_request
+    FOREIGN KEY ("requestId") REFERENCES "SupportRequest"(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS "idx_support_request_user"
+  ON "SupportRequest" ("userId");
+
+CREATE INDEX IF NOT EXISTS "idx_support_request_order"
+  ON "SupportRequest" ("orderId");
+
+CREATE INDEX IF NOT EXISTS "idx_support_message_user"
+  ON "SupportMessage" ("userId");
+
+CREATE INDEX IF NOT EXISTS "idx_support_message_request"
+  ON "SupportMessage" ("requestId");
+
 INSERT INTO "PaymentMethod" (code, title, provider, "methodType", "sortOrder")
 VALUES
   ('MOMO', 'MoMo', 'momo', 'redirect', 2),

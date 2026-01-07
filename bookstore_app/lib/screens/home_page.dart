@@ -121,7 +121,7 @@ class _HomePageState extends State<HomePage> {
         onOrderCompleted: widget.onOrderCompleted,
         userId: widget.userId,
       ),
-      'contact': const ContactPage(),
+      'contact': ContactPage(userId: widget.userId),
       'profile': ProfilePage(
         onLogout: widget.onLogout,
         userId: widget.userId,

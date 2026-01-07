@@ -14,6 +14,7 @@ const favoriteRoutes = require('./favorite.routes');
 const addressRoutes = require('./address.routes');
 const voucherRoutes = require('./voucher.routes');
 const shippingMethodRoutes = require('./shipping_method.routes');
+const supportRoutes = require('./support.routes');
 
 const router = Router();
 
@@ -31,5 +32,6 @@ router.use('/favorites', favoriteRoutes);
 router.use('/addresses', addressRoutes);
 router.use('/vouchers', voucherRoutes);
 router.use('/shipping-methods', shippingMethodRoutes);
+router.use('/support', supportRoutes);
 
 module.exports = router;
