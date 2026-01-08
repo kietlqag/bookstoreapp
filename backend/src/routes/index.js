@@ -17,6 +17,7 @@ const shippingMethodRoutes = require('./shipping_method.routes');
 const supportRoutes = require('./support.routes');
 const chatRoutes = require('./chat.routes');
 const notificationRoutes = require('./notification.routes');
+const flashSaleRoutes = require('./flash_sale.routes');
 
 const router = Router();
 
@@ -37,5 +38,6 @@ router.use('/shipping-methods', shippingMethodRoutes);
 router.use('/support', supportRoutes);
 router.use('/chat', chatRoutes);
 router.use('/notifications', notificationRoutes);
+router.use('/flash-sale', flashSaleRoutes);
 
 module.exports = router;

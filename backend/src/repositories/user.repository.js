@@ -117,6 +117,92 @@ async function updatePasswordByEmail({ email, passwordHash }) {
   return result.rows[0] || null;
 }
 
+async function updatePasswordById({ id, passwordHash }) {
+  const result = await pool.query(
+    'UPDATE "User" SET "passwordHash" = $1 WHERE id = $2 RETURNING id',
+    [passwordHash, id],
+  );
+  return result.rows[0] || null;
+}
+
+async function deactivateUser(id) {
+  const result = await pool.query(
+    'UPDATE "User" SET active = false WHERE id = $1 RETURNING id',
+    [id],
+  );
+  return result.rows[0] || null;
+}
+
+async function deleteUser(id) {
+  // Start transaction
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Get user data
+    const userResult = await client.query(
+      'SELECT * FROM "User" WHERE id = $1',
+      [id],
+    );
+    const user = userResult.rows[0];
+    
+    if (!user) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    // Copy user data to DeletedUser table
+    await client.query(
+      `INSERT INTO "DeletedUser" (
+        id, "fullName", email, "passwordHash", "googleId", "facebookId",
+        "phoneNumber", address, avatar, role, active, "originalCreatedAt"
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+      ON CONFLICT (id) DO UPDATE SET
+        "fullName" = EXCLUDED."fullName",
+        email = EXCLUDED.email,
+        "passwordHash" = EXCLUDED."passwordHash",
+        "googleId" = EXCLUDED."googleId",
+        "facebookId" = EXCLUDED."facebookId",
+        "phoneNumber" = EXCLUDED."phoneNumber",
+        address = EXCLUDED.address,
+        avatar = EXCLUDED.avatar,
+        role = EXCLUDED.role,
+        active = EXCLUDED.active,
+        "deletedAt" = NOW()`,
+      [
+        user.id,
+        user.fullName,
+        user.email,
+        user.passwordHash,
+        user.googleId,
+        user.facebookId,
+        user.phoneNumber,
+        user.address,
+        user.avatar,
+        user.role,
+        user.active || false,
+      ],
+    );
+
+    // Delete user from User table
+    // Foreign key constraints will handle related records:
+    // - Order.userId will be set to NULL (ON DELETE SET NULL)
+    // - Other tables with ON DELETE CASCADE will be deleted automatically
+    const deleteResult = await client.query(
+      'DELETE FROM "User" WHERE id = $1 RETURNING id',
+      [id],
+    );
+
+    await client.query('COMMIT');
+    return deleteResult.rows[0] || null;
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   findByEmail,
   findByPhone,
@@ -128,4 +214,7 @@ module.exports = {
   findProfileStats,
   updateProfile,
   updatePasswordByEmail,
+  updatePasswordById,
+  deactivateUser,
+  deleteUser,
 };

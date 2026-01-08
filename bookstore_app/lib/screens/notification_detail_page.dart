@@ -3,10 +3,17 @@ import 'package:flutter/material.dart';
 import '../models/notification_service.dart';
 import '../models/order_service.dart';
 import '../models/order.dart';
+import '../models/book_service.dart';
+import '../models/book.dart';
+import '../models/review_service.dart';
+import '../models/voucher_service.dart';
+import '../models/voucher.dart';
 import '../utils/date_formatter.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/header.dart';
+import '../widgets/price_formatter.dart';
 import 'order_detail_page.dart';
+import 'book_detail_page.dart';
 
 class NotificationDetailPage extends StatefulWidget {
   const NotificationDetailPage({
@@ -33,61 +40,134 @@ class NotificationDetailPage extends StatefulWidget {
 class _NotificationDetailPageState extends State<NotificationDetailPage> {
   late bool _isRead;
   late final OrderService _orderService = OrderService(baseUrl: widget.baseUrl);
+  late final BookService _bookService = BookService(baseUrl: widget.baseUrl);
+  late final ReviewService _reviewService = ReviewService(baseUrl: widget.baseUrl);
+  late final VoucherService _voucherService = VoucherService(baseUrl: widget.baseUrl);
   OrderSummary? _order;
+  Book? _book;
+  Voucher? _voucher;
+  bool _isLoading = false;
 
   @override
   void initState() {
     super.initState();
     _isRead = widget.notification.isRead;
-    // Load order if notification is order type
+    // Load related data based on notification type
     debugPrint('[NotificationDetail] Notification type: ${widget.notification.type}');
     debugPrint('[NotificationDetail] Notification relatedId: ${widget.notification.relatedId}');
-    debugPrint('[NotificationDetail] Notification type enum: ${widget.notification.notificationType}');
-    // Try to load order if relatedId exists (could be order notification)
+    
     if (widget.notification.relatedId != null && widget.notification.relatedId!.isNotEmpty) {
-      // Check if relatedId is a number (likely order ID)
-      final orderId = int.tryParse(widget.notification.relatedId!);
-      if (orderId != null) {
-        _loadOrder();
-      } else {
-        debugPrint('[NotificationDetail] relatedId is not a valid order ID: ${widget.notification.relatedId}');
+      final relatedId = int.tryParse(widget.notification.relatedId!);
+      if (relatedId != null) {
+        if (widget.notification.type == 'order' || widget.notification.type == 'order-status-update') {
+          _loadOrder();
+        } else if (widget.notification.type == 'product' || widget.notification.type == 'new_book') {
+          _loadBook();
+        } else if (widget.notification.type == 'voucher') {
+          _loadVoucher();
+        }
+        // flash_sale không cần load data, chỉ hiển thị nội dung
       }
-    } else {
-      debugPrint('[NotificationDetail] Skipping order load - no relatedId');
     }
   }
 
   Future<void> _loadOrder() async {
     final orderIdStr = widget.notification.relatedId;
-    if (orderIdStr == null || orderIdStr.isEmpty) {
-      debugPrint('[NotificationDetail] relatedId is null or empty');
-      return;
-    }
+    if (orderIdStr == null || orderIdStr.isEmpty) return;
     
     final orderId = int.tryParse(orderIdStr);
-    if (orderId == null) {
-      debugPrint('[NotificationDetail] Cannot parse relatedId to int: $orderIdStr');
-      return;
+    if (orderId == null) return;
+    
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
     }
     
-    debugPrint('[NotificationDetail] Loading order ID: $orderId for user: ${widget.userId}');
     try {
       final order = await _orderService.fetchOrder(
         orderId: orderId,
         userId: widget.userId,
       );
-      debugPrint('[NotificationDetail] Order loaded: ${order != null ? "Success" : "Null"}');
-      if (order != null) {
-        debugPrint('[NotificationDetail] Order has ${order.items.length} items');
-      }
       if (mounted) {
         setState(() {
           _order = order;
+          _isLoading = false;
         });
       }
     } catch (e) {
       debugPrint('[NotificationDetail] Error loading order: $e');
-      // Order not found or error
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadBook() async {
+    final bookIdStr = widget.notification.relatedId;
+    if (bookIdStr == null || bookIdStr.isEmpty) return;
+    
+    final bookId = int.tryParse(bookIdStr);
+    if (bookId == null) return;
+    
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+    
+    try {
+      final book = await _bookService.fetchBook(bookId);
+      if (mounted) {
+        setState(() {
+          _book = book;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('[NotificationDetail] Error loading book: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadVoucher() async {
+    final voucherIdStr = widget.notification.relatedId;
+    if (voucherIdStr == null || voucherIdStr.isEmpty) return;
+    
+    final voucherId = int.tryParse(voucherIdStr);
+    if (voucherId == null) return;
+    
+    if (mounted) {
+      setState(() {
+        _isLoading = true;
+      });
+    }
+    
+    try {
+      final vouchers = await _voucherService.fetchVouchers(activeOnly: false);
+      final voucher = vouchers.firstWhere(
+        (v) => v.id == voucherId,
+        orElse: () => vouchers.isNotEmpty ? vouchers.first : throw Exception('Voucher not found'),
+      );
+      if (mounted) {
+        setState(() {
+          _voucher = voucher.id == voucherId ? voucher : null;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('[NotificationDetail] Error loading voucher: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -311,37 +391,12 @@ class _NotificationDetailPageState extends State<NotificationDetailPage> {
                             ),
                       ),
                     ),
-                    // Show order card if we have relatedId (could be order)
+                    // Show related card based on notification type
                     if (widget.notification.relatedId != null &&
-                        int.tryParse(widget.notification.relatedId!) != null)
+                        widget.notification.relatedId!.isNotEmpty)
                       Padding(
                         padding: const EdgeInsets.only(top: 16),
-                        child: _order != null
-                            ? _buildOrderCard(_order!)
-                            : Container(
-                                padding: const EdgeInsets.all(16),
-                                decoration: BoxDecoration(
-                                  color: AppColors.gray50,
-                                  borderRadius: BorderRadius.circular(12),
-                                  border: Border.all(color: AppColors.gray200, width: 1),
-                                ),
-                                child: Row(
-                                  children: [
-                                    const SizedBox(
-                                      width: 16,
-                                      height: 16,
-                                      child: CircularProgressIndicator(strokeWidth: 2),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      'Đang tải thông tin đơn hàng...',
-                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                            color: AppColors.gray600,
-                                          ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                        child: _buildRelatedCard(),
                       ),
                     const SizedBox(height: 24),
                     // Các nút hành động
@@ -438,6 +493,118 @@ class _NotificationDetailPageState extends State<NotificationDetailPage> {
         ),
       ),
     );
+  }
+
+  Widget _buildRelatedCard() {
+    // Flash sale: không hiện card, chỉ hiện nội dung
+    if (widget.notification.type == 'flash_sale') {
+      return const SizedBox.shrink();
+    }
+    
+    // Order notifications
+    if (widget.notification.type == 'order' || widget.notification.type == 'order-status-update') {
+      if (_isLoading) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.gray50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.gray200, width: 1),
+          ),
+          child: Row(
+            children: [
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Đang tải thông tin đơn hàng...',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.gray600,
+                    ),
+              ),
+            ],
+          ),
+        );
+      }
+      if (_order != null) {
+        return _buildOrderCard(_order!);
+      }
+      return const SizedBox.shrink();
+    }
+    
+    // Product/Book notifications
+    if (widget.notification.type == 'product' || widget.notification.type == 'new_book') {
+      if (_isLoading) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.gray50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.gray200, width: 1),
+          ),
+          child: Row(
+            children: [
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Đang tải thông tin sách...',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.gray600,
+                    ),
+              ),
+            ],
+          ),
+        );
+      }
+      if (_book != null) {
+        return _buildBookCard(_book!);
+      }
+      return const SizedBox.shrink();
+    }
+    
+    // Voucher notifications
+    if (widget.notification.type == 'voucher') {
+      if (_isLoading) {
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.gray50,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.gray200, width: 1),
+          ),
+          child: Row(
+            children: [
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Đang tải thông tin voucher...',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppColors.gray600,
+                    ),
+              ),
+            ],
+          ),
+        );
+      }
+      if (_voucher != null) {
+        return _buildVoucherCard(_voucher!);
+      }
+      return const SizedBox.shrink();
+    }
+    
+    // Other notifications: no card
+    return const SizedBox.shrink();
   }
 
   Widget _buildOrderCard(OrderSummary order) {
@@ -559,6 +726,227 @@ class _NotificationDetailPageState extends State<NotificationDetailPage> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildBookCard(Book book) {
+    final discountRate = (book.discount / 100).clamp(0.0, 1.0);
+    final finalPrice = (book.price * (1 - discountRate)).clamp(0.0, double.infinity);
+
+    return InkWell(
+      onTap: () {
+        // Navigate to book detail page when card is clicked
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => BookDetailPage(
+              book: book,
+              bookService: _bookService,
+              reviewService: _reviewService,
+              isFavorite: false, // TODO: Get from favorite service if needed
+              onToggleFavorite: (Book b) async {
+                // TODO: Implement toggle favorite
+                return false;
+              },
+              onAddToCart: (Book b, int quantity) {
+                // TODO: Implement add to cart
+              },
+              userId: widget.userId,
+            ),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.gray50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.gray200, width: 1),
+        ),
+        child: Row(
+          children: [
+            // Book image
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: Image.network(
+                book.cover,
+                width: 60,
+                height: 60,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  width: 60,
+                  height: 60,
+                  color: AppColors.gray200,
+                  child: const Icon(Icons.book, size: 30),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            // Book info
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    book.title,
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.gray900,
+                        ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    book.author,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.gray600,
+                          fontSize: 12,
+                        ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      if (book.discount > 0) ...[
+                        Text(
+                          '${book.price.toInt()}đ',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppColors.gray500,
+                                fontSize: 11,
+                                decoration: TextDecoration.lineThrough,
+                              ),
+                        ),
+                        const SizedBox(width: 6),
+                      ],
+                      Text(
+                        '${finalPrice.toInt()}đ',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.orange600,
+                              fontSize: 13,
+                            ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              Icons.chevron_right,
+              size: 20,
+              color: AppColors.gray400,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVoucherCard(Voucher voucher) {
+    String discountText = '';
+    if (voucher.discountType == 'percent') {
+      discountText = 'Giảm ${voucher.discountValue.toInt()}%';
+      if (voucher.maxDiscount != null && voucher.maxDiscount! > 0) {
+        discountText += ' (tối đa ${formatPrice(voucher.maxDiscount!)})';
+      }
+    } else if (voucher.discountType == 'amount') {
+      discountText = 'Giảm ${formatPrice(voucher.discountValue)}';
+    } else if (voucher.discountType == 'shipping') {
+      discountText = 'Giảm phí vận chuyển ${formatPrice(voucher.discountValue)}';
+    }
+
+    final color = voucher.discountType == 'shipping'
+        ? const Color(0xFF14B8A6)
+        : voucher.discountType == 'percent'
+            ? const Color(0xFFF97316)
+            : const Color(0xFFE11D48);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.gray200, width: 1),
+      ),
+      child: Row(
+        children: [
+          // Voucher badge
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: color,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.local_offer,
+                  color: Colors.white,
+                  size: 24,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  voucher.code,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Voucher info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  voucher.title,
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.gray900,
+                      ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  discountText,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.gray700,
+                        fontSize: 13,
+                      ),
+                ),
+                if (voucher.minOrderValue > 0) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Đơn tối thiểu: ${formatPrice(voucher.minOrderValue)}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.gray600,
+                          fontSize: 12,
+                        ),
+                  ),
+                ],
+                if (voucher.endAt != null) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    'Hết hạn: ${DateFormatter.formatDateShort(voucher.endAt!)}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppColors.gray600,
+                          fontSize: 12,
+                        ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

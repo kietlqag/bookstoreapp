@@ -129,15 +129,24 @@ async function verify({ email, code }) {
 
 async function login({ email, password }) {
   const user = await userRepository.findByEmail(email);
+  
+  // Check if user exists and has password
   if (!user || !user.passwordHash) {
-    const error = new Error('Invalid credentials.');
+    const error = new Error('Tài khoản không tồn tại.');
     error.status = 401;
+    throw error;
+  }
+
+  // Check if account is active
+  if (user.active === false) {
+    const error = new Error('Tài khoản đang bị vô hiệu hóa.');
+    error.status = 403;
     throw error;
   }
 
   const matches = await bcrypt.compare(password, user.passwordHash);
   if (!matches) {
-    const error = new Error('Invalid credentials.');
+    const error = new Error('Mật khẩu không đúng.');
     error.status = 401;
     throw error;
   }
@@ -149,6 +158,12 @@ async function socialRegister({ provider, providerUserId, fullName }) {
   const lookup = getSocialLookup(provider, providerUserId);
   const existingByProvider = await lookup.findByProviderId(providerUserId);
   if (existingByProvider) {
+    // Check if account is active
+    if (existingByProvider.active === false) {
+      const error = new Error('Tài khoản đang bị vô hiệu hóa.');
+      error.status = 403;
+      throw error;
+    }
     return signSession(existingByProvider);
   }
 
@@ -167,8 +182,15 @@ async function socialLogin({ provider, providerUserId }) {
   const lookup = getSocialLookup(provider, providerUserId);
   const user = await lookup.findByProviderId(providerUserId);
   if (!user) {
-    const error = new Error('Account not found. Please register first.');
+    const error = new Error('Tài khoản không tồn tại. Vui lòng đăng ký trước.');
     error.status = 404;
+    throw error;
+  }
+
+  // Check if account is active
+  if (user.active === false) {
+    const error = new Error('Tài khoản đang bị vô hiệu hóa.');
+    error.status = 403;
     throw error;
   }
 

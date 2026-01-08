@@ -7,6 +7,8 @@ import '../models/book.dart';
 import '../models/cart_item.dart';
 import '../models/category_service.dart';
 import '../models/notification_service.dart';
+import '../models/flash_sale_service.dart';
+import '../models/flash_sale.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/bottom_nav.dart';
 import '../widgets/book_card.dart';
@@ -140,7 +142,7 @@ class _HomePageState extends State<HomePage> {
       return overrideUrl;
     }
     if (Platform.isAndroid) {
-      return 'http://192.168.1.4:8080';
+      return 'http://192.168.1.155:8080';
     }
     return 'http://localhost:8080';
   }
@@ -252,8 +254,11 @@ class _HomeTabState extends State<_HomeTab> {
   Duration _timeLeft = const Duration();
   late final NotificationService _notificationService =
       NotificationService(baseUrl: widget.baseUrl, token: widget.token);
+  late final FlashSaleService _flashSaleService = FlashSaleService(baseUrl: widget.baseUrl);
   int _unreadNotificationCount = 0;
   List<Book> _currentBooks = [];
+  FlashSale? _activeFlashSale;
+  List<Book> _flashSaleBooks = [];
 
   @override
   void didUpdateWidget(_HomeTab oldWidget) {
@@ -333,25 +338,86 @@ class _HomeTabState extends State<_HomeTab> {
     _currentBooks = widget.books;
     _loadCategories();
     _loadUnreadNotificationCount();
-    _flashEndsAt = DateTime.now().add(const Duration(hours: 5, minutes: 30));
-    _timeLeft = _flashEndsAt.difference(DateTime.now());
-    _flashTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-      final count = _currentBooks.length < 4 ? _currentBooks.length : 4;
-      if (count <= 1 || !_flashController.hasClients) return;
-      final next = (_flashIndex + 1) % count;
-      _flashController.animateToPage(
-        next,
-        duration: const Duration(milliseconds: 350),
-        curve: Curves.easeOutCubic,
-      );
-    });
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      final remaining = _flashEndsAt.difference(DateTime.now());
+    _loadFlashSale();
+  }
+
+  Future<void> _loadFlashSale() async {
+    try {
+      final flashSale = await _flashSaleService.getActiveFlashSale();
       if (!mounted) return;
+      
+      debugPrint('[HomePage] Flash sale loaded: ${flashSale != null}');
+      if (flashSale != null) {
+        debugPrint('[HomePage] Flash sale ID: ${flashSale.id}, name: ${flashSale.name}');
+        debugPrint('[HomePage] Flash sale startAt: ${flashSale.startAt}, endAt: ${flashSale.endAt}');
+        debugPrint('[HomePage] Flash sale books count: ${flashSale.books.length}');
+        debugPrint('[HomePage] Flash sale isActive: ${flashSale.isActive}');
+        debugPrint('[HomePage] Current time: ${DateTime.now()}');
+      }
+      
       setState(() {
-        _timeLeft = remaining.isNegative ? Duration.zero : remaining;
+        _activeFlashSale = flashSale;
+        if (flashSale != null && flashSale.books.isNotEmpty) {
+          _flashSaleBooks = flashSale.books;
+          _flashEndsAt = flashSale.endAt;
+          _timeLeft = flashSale.timeRemaining ?? Duration.zero;
+          
+          debugPrint('[HomePage] Setting flash sale books: ${_flashSaleBooks.length}');
+          
+          // Start auto-scroll timer
+          _flashTimer?.cancel();
+          if (_flashSaleBooks.length > 1) {
+            _flashTimer = Timer.periodic(const Duration(seconds: 4), (_) {
+              if (!_flashController.hasClients || _flashSaleBooks.length <= 1) return;
+              final next = (_flashIndex + 1) % _flashSaleBooks.length;
+              _flashController.animateToPage(
+                next,
+                duration: const Duration(milliseconds: 350),
+                curve: Curves.easeOutCubic,
+              );
+            });
+          }
+          
+          // Start countdown timer
+          _countdownTimer?.cancel();
+          _countdownTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+            if (!mounted) return;
+            if (_activeFlashSale != null) {
+              final remaining = _activeFlashSale!.timeRemaining;
+              if (remaining != null && !remaining.isNegative) {
+                setState(() {
+                  _timeLeft = remaining;
+                });
+              } else {
+                // Flash sale ended, reload to check for new one
+                debugPrint('[HomePage] Flash sale ended, reloading...');
+                _loadFlashSale();
+              }
+            }
+          });
+        } else {
+          // No active flash sale or no books, clear flash sale data
+          debugPrint('[HomePage] No flash sale or empty books, clearing data');
+          _flashSaleBooks = [];
+          _flashEndsAt = DateTime.now();
+          _timeLeft = Duration.zero;
+          _flashTimer?.cancel();
+          _countdownTimer?.cancel();
+        }
       });
-    });
+    } catch (e) {
+      debugPrint('[HomePage] Error loading flash sale: $e');
+      if (!mounted) return;
+      // Clear flash sale on error
+      setState(() {
+        _activeFlashSale = null;
+        _flashSaleBooks = [];
+        _flashEndsAt = DateTime.now();
+        _timeLeft = Duration.zero;
+        _flashTimer?.cancel();
+        _countdownTimer?.cancel();
+      });
+    }
   }
 
   Future<void> _loadUnreadNotificationCount() async {
@@ -403,7 +469,7 @@ class _HomeTabState extends State<_HomeTab> {
     final bestSellerBooks = [..._currentBooks]
       ..sort((a, b) => b.soldQuantity.compareTo(a.soldQuantity));
     final bestSellerTop5 = bestSellerBooks.take(5).toList();
-    final flashBooks = _currentBooks.take(4).toList();
+    // Flash books are only from active flash sale
 
     return Column(
       children: [
@@ -463,51 +529,56 @@ class _HomeTabState extends State<_HomeTab> {
             padding: const EdgeInsets.only(bottom: 24),
             children: [
               const SizedBox(height: 16),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: _FlashHeader(timeLeft: _timeLeft),
-              ),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 170,
-          child: PageView.builder(
-            controller: _flashController,
-            itemCount: flashBooks.length,
-            onPageChanged: (index) {
-              setState(() {
-                _flashIndex = index;
-              });
-            },
-            itemBuilder: (context, index) {
-              final book = flashBooks[index];
-              return Padding(
-                padding: const EdgeInsets.only(right: 12),
-                child: _FlashCard(
-                  book: book,
-                  onTap: () => widget.onOpenBook(book),
+              // Show flash sale section if there's a flash sale with books
+              // Backend already filters for active flash sales, so we can trust it
+              if (_activeFlashSale != null && _flashSaleBooks.isNotEmpty) ...[
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _FlashHeader(timeLeft: _timeLeft),
                 ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 10),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(flashBooks.length, (index) {
-            final isActive = index == _flashIndex;
-            return AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              width: isActive ? 16 : 6,
-              height: 6,
-              decoration: BoxDecoration(
-                color: isActive ? AppColors.orange600 : AppColors.gray200,
-                borderRadius: BorderRadius.circular(999),
-              ),
-            );
-          }),
-        ),
-        const SizedBox(height: 24),
+                const SizedBox(height: 12),
+                SizedBox(
+                  height: 170,
+                  child: PageView.builder(
+                    controller: _flashController,
+                    itemCount: _flashSaleBooks.length,
+                    onPageChanged: (index) {
+                      setState(() {
+                        _flashIndex = index;
+                      });
+                    },
+                    itemBuilder: (context, index) {
+                      final book = _flashSaleBooks[index];
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 12),
+                        child: _FlashCard(
+                          book: book,
+                          flashSale: _activeFlashSale,
+                          onTap: () => widget.onOpenBook(book),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(_flashSaleBooks.length, (index) {
+                    final isActive = index == _flashIndex;
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      width: isActive ? 16 : 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: isActive ? AppColors.orange600 : AppColors.gray200,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 24),
+              ],
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
@@ -833,16 +904,23 @@ class _TimeChip extends StatelessWidget {
 }
 
 class _FlashCard extends StatelessWidget {
-  const _FlashCard({required this.book, required this.onTap});
+  const _FlashCard({
+    required this.book,
+    this.flashSale,
+    required this.onTap,
+  });
 
   final Book book;
+  final FlashSale? flashSale;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final hasDiscount = book.discount > 0;
+    // Use flash sale discount if available, otherwise use book discount
+    final discountPercent = flashSale?.discountPercent ?? book.discount;
+    final hasDiscount = discountPercent > 0;
     final discountPrice = hasDiscount
-        ? book.price * (1 - book.discount / 100)
+        ? book.price * (1 - discountPercent / 100)
         : book.price;
 
     return InkWell(
@@ -908,7 +986,7 @@ class _FlashCard extends StatelessWidget {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        '-${book.discount.toInt()}%',
+                        '-${discountPercent.toInt()}%',
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w700,

@@ -778,8 +778,15 @@ class _FloatingChatWidgetState extends State<FloatingChatWidget>
     return InkWell(
       onTap: widget.onOpenBook != null
           ? () {
-              Navigator.of(context).pop(); // Đóng chat
-              widget.onOpenBook!(book);
+              // Đóng chat (ẩn đi) trước khi mở book detail
+              setState(() {
+                _isOpen = false;
+              });
+              // Dùng Future để đảm bảo chat đóng xong trước khi navigate
+              // Sử dụng rootNavigator context để đảm bảo navigation đúng
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                widget.onOpenBook!(book);
+              });
             }
           : null,
       borderRadius: BorderRadius.circular(12),

@@ -44,7 +44,7 @@ class _AddressListPageState extends State<AddressListPage> {
       return overrideUrl;
     }
     if (Platform.isAndroid) {
-      return 'http://192.168.1.4:8080';
+      return 'http://192.168.1.155:8080';
     }
     return 'http://localhost:8080';
   }

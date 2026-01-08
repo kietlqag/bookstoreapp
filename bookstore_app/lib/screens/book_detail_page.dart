@@ -203,7 +203,18 @@ class _BookDetailPageState extends State<BookDetailPage> {
           children: [
             HeaderBar(
               showBack: true,
-              onBack: () => Navigator.of(context).pop(),
+              onBack: () {
+                // Sử dụng rootNavigator để đảm bảo pop đúng route
+                final navigator = Navigator.of(context, rootNavigator: true);
+                if (navigator.canPop()) {
+                  navigator.pop();
+                } else {
+                  // Nếu không pop được, thử pop với context thường
+                  if (Navigator.of(context).canPop()) {
+                    Navigator.of(context).pop();
+                  }
+                }
+              },
               backgroundGradient: const LinearGradient(
                 colors: [AppColors.orange600, AppColors.rose500],
                 begin: Alignment.topLeft,

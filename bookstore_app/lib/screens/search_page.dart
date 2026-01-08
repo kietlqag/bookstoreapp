@@ -1,8 +1,8 @@
 ﻿import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/book.dart';
 import '../models/notification_service.dart';
+import '../models/search_history_service.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/book_card.dart';
 import '../widgets/category_chip.dart';
@@ -41,7 +41,6 @@ class _SearchPageState extends State<SearchPage> {
   final List<String> _recentSearches = [];
   String _selectedCategory = 'Tất cả';
   static const int _maxRecentSearches = 8;
-  static const String _recentSearchesKey = 'recent_searches';
   late final NotificationService _notificationService =
       NotificationService(baseUrl: widget.baseUrl, token: widget.token);
   int _unreadNotificationCount = 0;
@@ -97,44 +96,25 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Future<void> _loadRecentSearches() async {
-    final prefs = await SharedPreferences.getInstance();
-    final items = prefs.getStringList(_recentSearchesKey) ?? [];
+    final items = await SearchHistoryService.getSearchHistory();
+    // Giới hạn hiển thị 8 mục gần nhất
+    final limitedItems = items.take(_maxRecentSearches).toList();
     if (!mounted) return;
     setState(() {
       _recentSearches
         ..clear()
-        ..addAll(items);
+        ..addAll(limitedItems);
     });
   }
 
-  Future<void> _saveRecentSearches() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(_recentSearchesKey, _recentSearches);
+  Future<void> _addRecentSearch(String value) async {
+    await SearchHistoryService.addSearch(value);
+    await _loadRecentSearches();
   }
 
-  void _addRecentSearch(String value) {
-    final text = value.trim();
-    if (text.isEmpty) return;
-    setState(() {
-      _recentSearches.removeWhere(
-        (item) => _normalize(item) == _normalize(text),
-      );
-      _recentSearches.insert(0, text);
-      if (_recentSearches.length > _maxRecentSearches) {
-        _recentSearches.removeRange(
-          _maxRecentSearches,
-          _recentSearches.length,
-        );
-      }
-    });
-    _saveRecentSearches();
-  }
-
-  void _removeRecentSearch(String value) {
-    setState(() {
-      _recentSearches.remove(value);
-    });
-    _saveRecentSearches();
+  Future<void> _removeRecentSearch(String value) async {
+    await SearchHistoryService.removeSearch(value);
+    await _loadRecentSearches();
   }
 
   Future<void> _handleFavorite(Book book) async {

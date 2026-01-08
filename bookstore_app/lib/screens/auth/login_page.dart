@@ -54,9 +54,13 @@ class _LoginPageState extends State<LoginPage> {
         _passwordController.text.trim(),
       );
     } catch (error) {
+      // Hiển thị message lỗi cụ thể từ backend
+      final errorMessage = error.toString();
       showTopMessage(
         context,
-        message: 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.',
+        message: errorMessage.isNotEmpty 
+            ? errorMessage 
+            : 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.',
         type: TopMessageType.error,
       );
     } finally {
@@ -72,9 +76,13 @@ class _LoginPageState extends State<LoginPage> {
     try {
       await action();
     } catch (error) {
+      // Hiển thị message lỗi cụ thể từ backend
+      final errorMessage = error.toString();
       showTopMessage(
         context,
-        message: 'Đăng nhập thất bại. Vui lòng thử lại sau.',
+        message: errorMessage.isNotEmpty 
+            ? errorMessage 
+            : 'Đăng nhập thất bại. Vui lòng thử lại sau.',
         type: TopMessageType.error,
       );
     }

@@ -31,7 +31,7 @@ class _SupportRequestListPageState extends State<SupportRequestListPage> {
     const overrideUrl = String.fromEnvironment('API_BASE_URL');
     if (overrideUrl.isNotEmpty) return overrideUrl;
     if (Platform.isAndroid) {
-      return 'http://192.168.1.4:8080';
+      return 'http://192.168.1.155:8080';
     }
     return 'http://localhost:8080';
   }

@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
-import 'models/auth_service.dart';
+import 'models/auth_service.dart' show AuthService, AuthException;
 import 'models/auth_session.dart';
 import 'models/book.dart';
 import 'models/book_service.dart';
@@ -262,14 +262,22 @@ class _BookStoreAppState extends State<BookStoreApp> {
       return overrideUrl;
     }
     if (Platform.isAndroid) {
-      return 'http://192.168.1.4:8080';
+      return 'http://192.168.1.155:8080';
     }
     return 'http://localhost:8080';
   }
 
   Future<void> _login(String email, String password) async {
-    final session = await _authService.login(email: email, password: password);
-    _applySession(session);
+    try {
+      final session = await _authService.login(email: email, password: password);
+      _applySession(session);
+    } on AuthException catch (e) {
+      // Re-throw AuthException để login_page có thể hiển thị message cụ thể
+      rethrow;
+    } catch (e) {
+      // Nếu không phải AuthException, wrap thành AuthException
+      throw AuthException('Đăng nhập thất bại. Vui lòng thử lại sau.');
+    }
   }
 
   Future<void> _register(String fullName, String email, String password) async {
@@ -341,7 +349,7 @@ class _BookStoreAppState extends State<BookStoreApp> {
         final googleSignIn = GoogleSignIn(scopes: ['email']);
         final account = await googleSignIn.signIn();
         if (account == null) {
-          throw Exception('Đăng nhập Google bị hủy hoặc thất bại.');
+          throw AuthException('Đăng nhập Google bị hủy hoặc thất bại.');
         }
         final session = await _authService.socialLogin(
           provider: 'google',
@@ -350,33 +358,42 @@ class _BookStoreAppState extends State<BookStoreApp> {
         );
         _applySession(session);
         return;
+      } on AuthException {
+        rethrow;
       } catch (error) {
         debugPrint('Google login error: $error');
-        rethrow;
+        throw AuthException('Đăng nhập Google thất bại. Vui lòng thử lại sau.');
       }
     }
 
     if (provider == 'facebook') {
-      final result = await FacebookAuth.instance.login(
-        permissions: ['email', 'public_profile'],
-      );
-      if (result.status != LoginStatus.success) {
-        throw Exception('Facebook login failed.');
+      try {
+        final result = await FacebookAuth.instance.login(
+          permissions: ['email', 'public_profile'],
+        );
+        if (result.status != LoginStatus.success) {
+          throw AuthException('Đăng nhập Facebook thất bại.');
+        }
+        final data = await FacebookAuth.instance.getUserData(
+          fields: 'email,name',
+        );
+        final providerUserId = data['id']?.toString() ?? '';
+        final email = data['email']?.toString() ?? '';
+        if (providerUserId.isEmpty) {
+          throw AuthException('Không tìm thấy tài khoản Facebook.');
+        }
+        final session = await _authService.socialLogin(
+          provider: 'facebook',
+          providerUserId: providerUserId,
+          email: email,
+        );
+        _applySession(session);
+      } on AuthException {
+        rethrow;
+      } catch (error) {
+        debugPrint('Facebook login error: $error');
+        throw AuthException('Đăng nhập Facebook thất bại. Vui lòng thử lại sau.');
       }
-      final data = await FacebookAuth.instance.getUserData(
-        fields: 'email,name',
-      );
-      final providerUserId = data['id']?.toString() ?? '';
-      final email = data['email']?.toString() ?? '';
-      if (providerUserId.isEmpty) {
-        throw Exception('Facebook account not found.');
-      }
-      final session = await _authService.socialLogin(
-        provider: 'facebook',
-        providerUserId: providerUserId,
-        email: email,
-      );
-      _applySession(session);
     }
   }
 

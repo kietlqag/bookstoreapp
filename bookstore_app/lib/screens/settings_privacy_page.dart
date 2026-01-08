@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 
 import '../widgets/app_colors.dart';
+import '../models/profile_service.dart';
+import '../models/profile_summary.dart';
 
 class SettingsPrivacyPage extends StatefulWidget {
   const SettingsPrivacyPage({
@@ -24,15 +26,54 @@ class SettingsPrivacyPage extends StatefulWidget {
 
 class _SettingsPrivacyPageState extends State<SettingsPrivacyPage> {
   bool _loading = false;
+  ProfileSummary? _profile;
+  bool _loadingProfile = true;
+  late final ProfileService _profileService = ProfileService(baseUrl: _resolveBaseUrl());
 
   String _resolveBaseUrl() {
     const overrideUrl = String.fromEnvironment('API_BASE_URL');
     if (overrideUrl.isNotEmpty) return overrideUrl;
     if (Platform.isAndroid) {
-      return 'http://192.168.1.4:8080';
+      return 'http://192.168.1.155:8080';
     }
     return 'http://localhost:8080';
   }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reload profile when page becomes visible again (e.g., after editing profile)
+    final route = ModalRoute.of(context);
+    if (route != null && route.isCurrent) {
+      _loadProfile();
+    }
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final profile = await _profileService.fetchProfileSummary(widget.userId);
+      if (mounted) {
+        setState(() {
+          _profile = profile;
+          _loadingProfile = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loadingProfile = false;
+        });
+      }
+    }
+  }
+
+  bool get _hasEmail => _profile?.email != null && _profile!.email.trim().isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -70,12 +111,6 @@ class _SettingsPrivacyPageState extends State<SettingsPrivacyPage> {
           _buildSectionHeader('Bảo mật tài khoản'),
           const SizedBox(height: 8),
           _buildSecurityCard(),
-          const SizedBox(height: 24),
-
-          // Quyền riêng tư
-          _buildSectionHeader('Quyền riêng tư'),
-          const SizedBox(height: 8),
-          _buildPrivacyCard(),
           const SizedBox(height: 24),
 
           // Vùng nguy hiểm
@@ -119,8 +154,16 @@ class _SettingsPrivacyPageState extends State<SettingsPrivacyPage> {
             icon: Icons.lock_outline,
             iconColor: AppColors.orange600,
             title: 'Đổi mật khẩu',
-            subtitle: 'Cập nhật mật khẩu đăng nhập',
-            onTap: () => _showChangePasswordDialog(),
+            subtitle: _loadingProfile
+                ? 'Đang tải...'
+                : (_hasEmail 
+                    ? 'Cập nhật mật khẩu đăng nhập'
+                    : 'Vui lòng cập nhật email trước'),
+            onTap: _loadingProfile
+                ? null
+                : (_hasEmail 
+                    ? () => _showChangePasswordDialog()
+                    : () => _showEmailRequiredDialog()),
           ),
           const Divider(height: 1, indent: 68),
           _buildTile(
@@ -144,65 +187,6 @@ class _SettingsPrivacyPageState extends State<SettingsPrivacyPage> {
               ),
             ),
           ),
-          const Divider(height: 1, indent: 68),
-          _buildTile(
-            icon: Icons.devices_outlined,
-            iconColor: Colors.blue,
-            title: 'Thiết bị đăng nhập',
-            subtitle: 'Quản lý các thiết bị đã đăng nhập',
-            onTap: () => _showDevicesDialog(),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPrivacyCard() {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        children: [
-          _buildTile(
-            icon: Icons.visibility_outlined,
-            iconColor: AppColors.gray600,
-            title: 'Hiển thị hồ sơ',
-            subtitle: 'Cho phép người khác xem hồ sơ',
-            trailing: Transform.scale(
-              scale: 0.75,
-              child: Switch(
-                value: true,
-                onChanged: (v) {},
-                activeColor: AppColors.orange600,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-            ),
-          ),
-          const Divider(height: 1, indent: 68),
-          _buildTile(
-            icon: Icons.history_outlined,
-            iconColor: AppColors.gray600,
-            title: 'Lịch sử tìm kiếm',
-            subtitle: 'Xóa lịch sử tìm kiếm',
-            onTap: () => _showClearSearchHistoryDialog(),
-          ),
-          const Divider(height: 1, indent: 68),
-          _buildTile(
-            icon: Icons.policy_outlined,
-            iconColor: AppColors.gray600,
-            title: 'Chính sách bảo mật',
-            subtitle: 'Xem chính sách bảo mật',
-            onTap: () => _showPrivacyPolicyDialog(),
-          ),
         ],
       ),
     );
@@ -224,14 +208,6 @@ class _SettingsPrivacyPageState extends State<SettingsPrivacyPage> {
       ),
       child: Column(
         children: [
-          _buildTile(
-            icon: Icons.logout,
-            iconColor: Colors.orange,
-            title: 'Đăng xuất tất cả thiết bị',
-            subtitle: 'Đăng xuất khỏi tất cả thiết bị khác',
-            onTap: () => _showLogoutAllDialog(),
-          ),
-          const Divider(height: 1, indent: 68),
           _buildTile(
             icon: Icons.delete_forever_outlined,
             iconColor: Colors.red,
@@ -294,6 +270,42 @@ class _SettingsPrivacyPageState extends State<SettingsPrivacyPage> {
               Icon(Icons.chevron_right, color: AppColors.gray400),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showEmailRequiredDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.email_outlined, color: AppColors.orange600),
+            SizedBox(width: 8),
+            Text('Cập nhật email'),
+          ],
+        ),
+        content: const Text(
+          'Để đổi mật khẩu, bạn cần cập nhật email trước.\n\n'
+          'Vui lòng quay lại trang hồ sơ và cập nhật email trong phần chỉnh sửa hồ sơ.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Đóng'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context); // Close dialog
+              Navigator.pop(context); // Close settings page to go back to profile
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.orange600,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Quay lại hồ sơ'),
+          ),
+        ],
       ),
     );
   }
@@ -375,10 +387,19 @@ class _SettingsPrivacyPageState extends State<SettingsPrivacyPage> {
               onPressed: _loading
                   ? null
                   : () async {
-                      if (newController.text != confirmController.text) {
+                      // Validate inputs
+                      if (currentController.text.isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('Mật khẩu xác nhận không khớp'),
+                            content: Text('Vui lòng nhập mật khẩu hiện tại'),
+                          ),
+                        );
+                        return;
+                      }
+                      if (newController.text.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Vui lòng nhập mật khẩu mới'),
                           ),
                         );
                         return;
@@ -391,11 +412,29 @@ class _SettingsPrivacyPageState extends State<SettingsPrivacyPage> {
                         );
                         return;
                       }
-                      await _changePassword(
+                      if (newController.text != confirmController.text) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Mật khẩu xác nhận không khớp'),
+                          ),
+                        );
+                        return;
+                      }
+                      if (currentController.text == newController.text) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Mật khẩu mới phải khác mật khẩu hiện tại'),
+                          ),
+                        );
+                        return;
+                      }
+                      final success = await _changePassword(
                         currentController.text,
                         newController.text,
                       );
-                      if (context.mounted) Navigator.pop(context);
+                      if (context.mounted && success) {
+                        Navigator.pop(context);
+                      }
                     },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.orange600,
@@ -415,7 +454,7 @@ class _SettingsPrivacyPageState extends State<SettingsPrivacyPage> {
     );
   }
 
-  Future<void> _changePassword(String currentPassword, String newPassword) async {
+  Future<bool> _changePassword(String currentPassword, String newPassword) async {
     setState(() => _loading = true);
     try {
       final response = await http.put(
@@ -430,304 +469,244 @@ class _SettingsPrivacyPageState extends State<SettingsPrivacyPage> {
         }),
       );
 
-      if (!mounted) return;
+      if (!mounted) return false;
 
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Đổi mật khẩu thành công')),
+          const SnackBar(
+            content: Text('Đổi mật khẩu thành công'),
+            backgroundColor: Colors.green,
+          ),
         );
+        return true;
       } else {
-        final data = jsonDecode(response.body);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message'] ?? 'Đổi mật khẩu thất bại')),
-        );
+        String errorMessage = 'Đổi mật khẩu thất bại';
+        bool isEmailRequired = false;
+        try {
+          final data = jsonDecode(response.body);
+          errorMessage = data['message'] ?? errorMessage;
+          isEmailRequired = data['code'] == 'EMAIL_REQUIRED' || 
+                           errorMessage.contains('email') ||
+                           errorMessage.contains('Email');
+        } catch (_) {
+          // If JSON decode fails, use default message
+        }
+        
+        if (isEmailRequired && response.statusCode == 400) {
+          // Reload profile to check email status
+          await _loadProfile();
+          // Show email required dialog
+          if (mounted) {
+            _showEmailRequiredDialog();
+          }
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return false;
       }
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đã xảy ra lỗi: $e')),
+        SnackBar(
+          content: Text('Đã xảy ra lỗi: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
       );
+      return false;
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  void _showDevicesDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Thiết bị đăng nhập'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildDeviceItem(
-              icon: Icons.phone_android,
-              name: 'Thiết bị hiện tại',
-              info: 'Android • Đang hoạt động',
-              isCurrent: true,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Đóng'),
-          ),
-        ],
-      ),
-    );
-  }
+  void _showDeleteAccountDialog() async {
+    // Kiểm tra email trước
+    if (!_hasEmail) {
+      _showEmailRequiredDialog();
+      return;
+    }
 
-  Widget _buildDeviceItem({
-    required IconData icon,
-    required String name,
-    required String info,
-    bool isCurrent = false,
-  }) {
-    return ListTile(
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: AppColors.gray100,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: AppColors.gray600),
-      ),
-      title: Row(
-        children: [
-          Text(name),
-          if (isCurrent) ...[
-            const SizedBox(width: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: const Text(
-                'Hiện tại',
-                style: TextStyle(
-                  fontSize: 10,
-                  color: Colors.green,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-      subtitle: Text(info),
-    );
-  }
-
-  void _showClearSearchHistoryDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Xóa lịch sử tìm kiếm'),
-        content: const Text(
-          'Bạn có chắc chắn muốn xóa toàn bộ lịch sử tìm kiếm?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              // Clear search history from SharedPreferences
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Đã xóa lịch sử tìm kiếm')),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Xóa'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showPrivacyPolicyDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Chính sách bảo mật'),
-        content: const SingleChildScrollView(
-          child: Text(
-            '''CHÍNH SÁCH BẢO MẬT
-
-1. Thu thập thông tin
-Chúng tôi thu thập các thông tin sau:
-• Thông tin cá nhân (họ tên, email, số điện thoại)
-• Địa chỉ giao hàng
-• Lịch sử mua hàng
-• Thông tin thiết bị
-
-2. Sử dụng thông tin
-Thông tin được sử dụng để:
-• Xử lý đơn hàng
-• Giao hàng
-• Hỗ trợ khách hàng
-• Gửi thông báo khuyến mãi (nếu bạn đồng ý)
-
-3. Bảo vệ thông tin
-• Mã hóa dữ liệu SSL
-• Không chia sẻ thông tin cho bên thứ 3
-• Lưu trữ an toàn trên server
-
-4. Quyền của bạn
-• Truy cập và chỉnh sửa thông tin
-• Yêu cầu xóa dữ liệu
-• Từ chối nhận email marketing
-
-5. Liên hệ
-Mọi thắc mắc về bảo mật, vui lòng liên hệ:
-support@kbook.vn
-''',
-            style: TextStyle(fontSize: 12, height: 1.5),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Đóng'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showLogoutAllDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Đăng xuất tất cả thiết bị'),
-        content: const Text(
-          'Bạn sẽ bị đăng xuất khỏi tất cả các thiết bị khác. Tiếp tục?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Đã đăng xuất tất cả thiết bị khác'),
-                ),
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.orange,
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Đăng xuất'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showDeleteAccountDialog() {
     final confirmController = TextEditingController();
+    final otpController = TextEditingController();
+    bool showOtpStep = false;
+    bool sendingOtp = false;
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Row(
-          children: [
-            Icon(Icons.warning_amber, color: Colors.red),
-            const SizedBox(width: 8),
-            const Text('Xóa tài khoản'),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Hành động này không thể hoàn tác!\n\n'
-              'Tất cả dữ liệu của bạn sẽ bị xóa vĩnh viễn:\n'
-              '• Thông tin cá nhân\n'
-              '• Lịch sử đơn hàng\n'
-              '• Danh sách yêu thích\n'
-              '• Đánh giá và bình luận',
-              style: TextStyle(fontSize: 13),
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: confirmController,
-              decoration: const InputDecoration(
-                labelText: 'Nhập "XOA TAI KHOAN" để xác nhận',
-                border: OutlineInputBorder(),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.warning_amber, color: Colors.red),
+              const SizedBox(width: 8),
+              const Text('Xóa tài khoản'),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () {
-              if (confirmController.text == 'XOA TAI KHOAN') {
-                Navigator.pop(context);
-                _deleteAccount();
-              } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Vui lòng nhập đúng "XOA TAI KHOAN"'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (!showOtpStep) ...[
+                  const Text(
+                    'Hành động này không thể hoàn tác!\n\n'
+                    'Tài khoản của bạn sẽ bị vô hiệu hóa:\n'
+                    '• Thông tin cá nhân\n'
+                    '• Lịch sử đơn hàng\n'
+                    '• Danh sách yêu thích\n'
+                    '• Đánh giá và bình luận',
+                    style: TextStyle(fontSize: 13),
                   ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: confirmController,
+                    decoration: const InputDecoration(
+                      labelText: 'Nhập "XOA TAI KHOAN" để xác nhận',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ] else ...[
+                  const Text(
+                    'Mã OTP đã được gửi đến email của bạn.\n'
+                    'Vui lòng nhập mã OTP để xác nhận xóa tài khoản.',
+                    style: TextStyle(fontSize: 13),
+                  ),
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: otpController,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      labelText: 'Mã OTP',
+                      border: OutlineInputBorder(),
+                    ),
+                    maxLength: 6,
+                  ),
+                ],
+              ],
             ),
-            child: const Text('Xóa tài khoản'),
           ),
-        ],
+          actions: [
+            TextButton(
+              onPressed: sendingOtp || _loading
+                  ? null
+                  : () => Navigator.pop(context),
+              child: const Text('Hủy'),
+            ),
+            ElevatedButton(
+              onPressed: sendingOtp || _loading
+                  ? null
+                  : () async {
+                      if (!showOtpStep) {
+                        if (confirmController.text != 'XOA TAI KHOAN') {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Vui lòng nhập đúng "XOA TAI KHOAN"'),
+                            ),
+                          );
+                          return;
+                        }
+                        // Gửi OTP
+                        setDialogState(() => sendingOtp = true);
+                        try {
+                          await _profileService.requestAccountDeletion(
+                            userId: widget.userId,
+                            token: widget.token,
+                          );
+                          setDialogState(() {
+                            sendingOtp = false;
+                            showOtpStep = true;
+                          });
+                        } catch (e) {
+                          setDialogState(() => sendingOtp = false);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Đã xảy ra lỗi: ${e.toString()}'),
+                                backgroundColor: Colors.red,
+                              ),
+                            );
+                          }
+                        }
+                      } else {
+                        // Xác nhận OTP và xóa tài khoản
+                        final code = otpController.text.trim();
+                        if (code.isEmpty || code.length != 6) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Vui lòng nhập mã OTP hợp lệ'),
+                            ),
+                          );
+                          return;
+                        }
+                        final success = await _verifyAndDeleteAccount(code);
+                        if (context.mounted && success) {
+                          Navigator.pop(context);
+                        }
+                      }
+                    },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: sendingOtp
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : Text(showOtpStep ? 'Xác nhận xóa' : 'Tiếp tục'),
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  Future<void> _deleteAccount() async {
+  Future<bool> _verifyAndDeleteAccount(String code) async {
     setState(() => _loading = true);
     try {
-      final response = await http.delete(
-        Uri.parse('${_resolveBaseUrl()}/api/users/${widget.userId}'),
-        headers: {
-          'Authorization': 'Bearer ${widget.token}',
-        },
+      final success = await _profileService.verifyAccountDeletion(
+        userId: widget.userId,
+        code: code,
+        token: widget.token,
       );
 
-      if (!mounted) return;
+      if (!mounted) return false;
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
+      if (success) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Tài khoản đã được xóa')),
+          const SnackBar(
+            content: Text('Tài khoản đã được xóa'),
+            backgroundColor: Colors.green,
+          ),
         );
-        widget.onLogout();
+        // Đăng xuất sau 1 giây
+        Future.delayed(const Duration(seconds: 1), () {
+          widget.onLogout();
+        });
+        return true;
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Không thể xóa tài khoản')),
+          const SnackBar(
+            content: Text('Xác nhận thất bại'),
+            backgroundColor: Colors.red,
+          ),
         );
+        return false;
       }
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted) return false;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đã xảy ra lỗi: $e')),
+        SnackBar(
+          content: Text('Đã xảy ra lỗi: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
       );
+      return false;
     } finally {
       if (mounted) setState(() => _loading = false);
     }

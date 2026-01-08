@@ -320,6 +320,32 @@ CREATE INDEX IF NOT EXISTS "idx_support_message_read"
 CREATE INDEX IF NOT EXISTS "idx_support_message_created"
   ON "SupportMessage" ("createdAt" DESC);
 
+CREATE TABLE IF NOT EXISTS "FlashSale" (
+  id SERIAL PRIMARY KEY,
+  name VARCHAR(100) NOT NULL,
+  "startAt" TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+  "endAt" TIMESTAMP WITHOUT TIME ZONE NOT NULL,
+  "discountPercent" NUMERIC(5,2) NOT NULL,
+  "createdAt" TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
+  "updatedAt" TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS "FlashSaleBook" (
+  "flash_sale_id" INTEGER NOT NULL,
+  "book_id" INTEGER NOT NULL,
+  PRIMARY KEY ("flash_sale_id", "book_id"),
+  CONSTRAINT fk_flash_sale
+    FOREIGN KEY ("flash_sale_id") REFERENCES "FlashSale"(id) ON DELETE CASCADE,
+  CONSTRAINT fk_flash_sale_book
+    FOREIGN KEY ("book_id") REFERENCES "Book"(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_flash_sale_created
+  ON "FlashSale" ("createdAt" DESC);
+
+CREATE INDEX IF NOT EXISTS idx_flash_sale_book_book
+  ON "FlashSaleBook" ("book_id");
+
 INSERT INTO "PaymentMethod" (code, title, provider, "methodType", "sortOrder")
 VALUES
   ('MOMO', 'Thanh toán với MoMo', 'momo', 'redirect', 2),

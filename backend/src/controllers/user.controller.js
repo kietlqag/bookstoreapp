@@ -121,6 +121,80 @@ async function verifyPhoneChange(req, res, next) {
   }
 }
 
+async function changePassword(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ message: 'Invalid user id.' });
+    }
+
+    // Verify that the authenticated user is changing their own password
+    if (req.user && req.user.id !== id) {
+      return res.status(403).json({ message: 'You can only change your own password.' });
+    }
+
+    const currentPassword = req.body?.currentPassword?.toString() || '';
+    const newPassword = req.body?.newPassword?.toString() || '';
+
+    const result = await userService.changePassword(id, currentPassword, newPassword);
+    return res.json(result);
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ message: error.message });
+    }
+    return next(error);
+  }
+}
+
+async function requestAccountDeletion(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ message: 'Invalid user id.' });
+    }
+
+    // Verify that the authenticated user is deleting their own account
+    if (req.user && req.user.id !== id) {
+      return res.status(403).json({ message: 'You can only delete your own account.' });
+    }
+
+    const result = await userService.requestAccountDeletion(id);
+    return res.json(result);
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ 
+        message: error.message,
+        code: error.code,
+      });
+    }
+    return next(error);
+  }
+}
+
+async function verifyAccountDeletion(req, res, next) {
+  try {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) {
+      return res.status(400).json({ message: 'Invalid user id.' });
+    }
+
+    // Verify that the authenticated user is deleting their own account
+    if (req.user && req.user.id !== id) {
+      return res.status(403).json({ message: 'You can only delete your own account.' });
+    }
+
+    const code = req.body?.code?.toString() || '';
+
+    const result = await userService.verifyAccountDeletion(id, code);
+    return res.json(result);
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ message: error.message });
+    }
+    return next(error);
+  }
+}
+
 module.exports = {
   getUser,
   getUserSummary,
@@ -129,4 +203,7 @@ module.exports = {
   verifyEmailChange,
   requestPhoneChange,
   verifyPhoneChange,
+  changePassword,
+  requestAccountDeletion,
+  verifyAccountDeletion,
 };

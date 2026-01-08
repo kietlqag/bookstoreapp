@@ -45,7 +45,7 @@ class _VoucherPageState extends State<VoucherPage> {
       return overrideUrl;
     }
     if (Platform.isAndroid) {
-      return 'http://192.168.1.4:8080';
+      return 'http://192.168.1.155:8080';
     }
     return 'http://localhost:8080';
   }
@@ -364,7 +364,8 @@ class _VoucherPageState extends State<VoucherPage> {
     final expiryLine = voucher.endAt != null
         ? 'Hết hạn ${DateFormatter.formatDateShort(voucher.endAt!)}'
         : null;
-    final condition = usedLine ?? expiryLine ?? 'C\u00f2n hi\u1ec7u l\u1ef1c';
+    // condition chỉ chứa usedLine hoặc mặc định, không chứa expiryLine để tránh duplicate
+    final condition = usedLine ?? 'C\u00f2n hi\u1ec7u l\u1ef1c';
 
     final color = voucher.discountType == 'shipping'
         ? const Color(0xFF14B8A6)

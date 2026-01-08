@@ -178,7 +178,9 @@ async function chatWithAI(messages) {
    ${validPeriod ? `- Thời gian: ${validPeriod}` : ''}`;
     }).join('\n\n');
     
-    enhancedSystemPrompt += `\n\nDanh sách voucher/khuyến mãi hiện có (${allVouchers.length} voucher):\n\n${vouchersInfo}\n\nKhi khách hàng hỏi về voucher, mã giảm giá, khuyến mãi, hãy phân tích yêu cầu dựa trên: tiêu đề, mức giảm giá, điều kiện đơn tối thiểu, và đặc biệt là MÔ TẢ để đề xuất các voucher phù hợp nhất từ danh sách trên.`;
+    // Liệt kê tất cả voucher codes có sẵn để GPT chỉ đề xuất codes thực tế
+    const availableCodes = allVouchers.map(v => v.code).join(', ');
+    enhancedSystemPrompt += `\n\nDanh sách voucher/khuyến mãi hiện có (${allVouchers.length} voucher):\n\n${vouchersInfo}\n\n⚠️ QUAN TRỌNG: Bạn CHỈ được đề xuất các voucherCodes thực tế có trong danh sách trên. Các codes có sẵn là: [${availableCodes}]. KHÔNG được đề xuất code không tồn tại. Nếu KHÔNG có voucher phù hợp trong danh sách, hãy để voucherCodes = [].\n\nKhi khách hàng hỏi về voucher, mã giảm giá, khuyến mãi, hãy phân tích yêu cầu dựa trên: tiêu đề, mức giảm giá, điều kiện đơn tối thiểu, và đặc biệt là MÔ TẢ để đề xuất các voucher phù hợp nhất từ danh sách trên.`;
     hasDataToShow = true;
   }
   
@@ -388,13 +390,55 @@ async function chatWithAI(messages) {
             }
           }
           
-          // Lấy thông tin voucher từ voucherCodes
+          // Lấy thông tin voucher từ voucherCodes - chỉ lấy voucher có trong DB
           let suggestedVouchers = [];
-          if (suggestedVoucherCodes.length > 0 && allVouchers.length > 0) {
-            suggestedVouchers = allVouchers.filter(voucher => 
-              suggestedVoucherCodes.includes(voucher.code)
-            );
-            console.log(`[Chat] GPT selected ${suggestedVouchers.length} vouchers (Codes: ${suggestedVoucherCodes.join(', ')}) from ${allVouchers.length} total vouchers`);
+          if (isVoucherQuery) {
+            // Đảm bảo allVouchers đã được load
+            if (allVouchers.length === 0) {
+              console.log(`[Chat] No vouchers loaded, attempting to load...`);
+              try {
+                allVouchers = await voucherService.listVouchers({ activeOnly: true });
+                console.log(`[Chat] Loaded ${allVouchers.length} vouchers`);
+              } catch (loadError) {
+                console.error('[Chat] Error loading vouchers:', loadError);
+              }
+            }
+            
+            // Validate codes từ GPT - chỉ lấy codes thực tế có trong DB
+            const availableCodes = allVouchers.map(v => v.code);
+            let validVoucherCodes = [];
+            
+            if (suggestedVoucherCodes.length > 0 && allVouchers.length > 0) {
+              validVoucherCodes = suggestedVoucherCodes.filter(code => 
+                availableCodes.includes(code)
+              );
+              
+              if (validVoucherCodes.length !== suggestedVoucherCodes.length) {
+                const invalidCodes = suggestedVoucherCodes.filter(code => !availableCodes.includes(code));
+                console.log(`[Chat] Warning: GPT suggested invalid voucher codes: [${invalidCodes.join(', ')}]. Valid codes in DB: [${availableCodes.join(', ')}]`);
+              }
+              
+              // Tìm voucher từ validVoucherCodes
+              suggestedVouchers = allVouchers.filter(voucher => 
+                validVoucherCodes.includes(voucher.code)
+              );
+              console.log(`[Chat] Found ${suggestedVouchers.length} vouchers from GPT suggestions (valid codes: [${validVoucherCodes.join(', ')}])`);
+            }
+            
+            // Nếu không có voucher phù hợp, cập nhật message để thông báo không có
+            if (suggestedVouchers.length === 0 && allVouchers.length > 0) {
+              // Chỉ cập nhật message nếu chưa có message về sách (để tránh ghi đè message sách)
+              if (!message.includes('Xin lỗi, hiện tại chúng tôi không có sách phù hợp')) {
+                message = 'Xin lỗi, hiện tại chúng tôi không có voucher phù hợp với yêu cầu của bạn. Vui lòng kiểm tra lại sau hoặc liên hệ hỗ trợ để được tư vấn.';
+                console.log(`[Chat] No vouchers found, updated message to inform user`);
+              }
+            } else if (suggestedVouchers.length === 0 && allVouchers.length === 0) {
+              // Không có voucher nào trong DB
+              if (!message.includes('Xin lỗi, hiện tại chúng tôi không có sách phù hợp')) {
+                message = 'Hiện tại cửa hàng chưa có voucher/khuyến mãi nào. Vui lòng kiểm tra lại sau.';
+                console.log(`[Chat] No vouchers in DB, updated message to inform user`);
+              }
+            }
           }
           
           console.log(`[Chat] Final response: message length=${message.length}, books=${suggestedBooks.length}, vouchers=${suggestedVouchers.length}`);
