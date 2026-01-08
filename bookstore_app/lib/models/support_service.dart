@@ -217,6 +217,88 @@ class SupportService {
       client.close(force: true);
     }
   }
+
+  Future<List<int>> markMessagesAsRead({
+    required int userId,
+    List<int>? messageIds,
+  }) async {
+    final client = HttpClient();
+    try {
+      final uri = Uri.parse('$baseUrl/api/support/messages/read');
+      final request = await client.putUrl(uri);
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode({
+        'userId': userId,
+        if (messageIds != null) 'messageIds': messageIds,
+      }));
+
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+      
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw SupportException('Đánh dấu tin nhắn đã đọc thất bại.');
+      }
+      
+      if (body.isEmpty) {
+        return [];
+      }
+      
+      final data = jsonDecode(body);
+      if (data is! Map<String, dynamic>) {
+        throw SupportException('Định dạng phản hồi không hợp lệ.');
+      }
+      
+      final messageIdsList = data['messageIds'] as List?;
+      if (messageIdsList == null) {
+        return [];
+      }
+      
+      return messageIdsList
+          .whereType<int>()
+          .toList();
+    } on SocketException {
+      throw SupportException('Không thể kết nối đến server.');
+    } on FormatException {
+      throw SupportException('Định dạng phản hồi không hợp lệ.');
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  Future<int> getUnreadMessageCount({required int userId}) async {
+    final client = HttpClient();
+    try {
+      final uri = Uri.parse('$baseUrl/api/support/messages/unread-count').replace(
+        queryParameters: {'userId': userId.toString()},
+      );
+      final request = await client.getUrl(uri);
+      request.headers.contentType = ContentType.json;
+
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw SupportException('Lấy số lượng tin nhắn chưa đọc thất bại.');
+      }
+
+      if (body.isEmpty) {
+        return 0;
+      }
+
+      final data = jsonDecode(body);
+      if (data is! Map<String, dynamic>) {
+        throw SupportException('Định dạng phản hồi không hợp lệ.');
+      }
+
+      return data['count'] as int? ?? 0;
+    } on SocketException {
+      throw SupportException('Không thể kết nối đến server.');
+    } on FormatException {
+      throw SupportException('Định dạng phản hồi không hợp lệ.');
+    } finally {
+      client.close(force: true);
+    }
+  }
 }
 
 class SupportRequest {
@@ -396,6 +478,7 @@ class SupportMessage {
     required this.userId,
     required this.message,
     required this.isFromUser,
+    required this.isRead,
     required this.createdAt,
     this.requestId,
   });
@@ -404,6 +487,7 @@ class SupportMessage {
   final int userId;
   final String message;
   final bool isFromUser;
+  final bool isRead;
   final DateTime createdAt;
   final int? requestId;
 
@@ -413,6 +497,7 @@ class SupportMessage {
       userId: json['userId'] as int,
       message: json['message'] as String,
       isFromUser: json['isFromUser'] as bool? ?? true,
+      isRead: json['isRead'] as bool? ?? false,
       createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
       requestId: json['requestId'] as int?,
     );

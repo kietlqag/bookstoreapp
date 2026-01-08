@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../models/voucher.dart';
 import '../models/voucher_service.dart';
+import '../utils/date_formatter.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/price_formatter.dart';
 import '../widgets/top_message.dart';
@@ -361,7 +362,7 @@ class _VoucherPageState extends State<VoucherPage> {
             ? '\u0110\u00e3 d\u00f9ng ${voucher.usedCount}'
             : null);
     final expiryLine = voucher.endAt != null
-        ? 'H\u1ebft h\u1ea1n ${_formatDate(voucher.endAt!)}'
+        ? 'Hết hạn ${DateFormatter.formatDateShort(voucher.endAt!)}'
         : null;
     final condition = usedLine ?? expiryLine ?? 'C\u00f2n hi\u1ec7u l\u1ef1c';
 
@@ -405,11 +406,6 @@ class _VoucherPageState extends State<VoucherPage> {
     );
   }
 
-  String _formatDate(DateTime date) {
-    final day = date.day.toString().padLeft(2, '0');
-    final month = date.month.toString().padLeft(2, '0');
-    return '$day/$month';
-  }
 
   @override
   void dispose() {
@@ -946,7 +942,7 @@ class _BottomBar extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Text('OK'),
+              child: const Text('Xác nhận'),
             ),
           ),
         ],

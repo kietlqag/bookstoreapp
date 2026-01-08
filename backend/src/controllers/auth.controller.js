@@ -106,6 +106,48 @@ function handleError(error, res, next) {
   return res.status(status).json({ message: error.message });
 }
 
+async function forgotPassword(req, res, next) {
+  try {
+    const { email } = req.body || {};
+    if (!email) {
+      return res.status(400).json({ message: 'Email is required.' });
+    }
+
+    const result = await authService.forgotPassword({ email });
+    return res.json(result);
+  } catch (error) {
+    return handleError(error, res, next);
+  }
+}
+
+async function verifyResetOtp(req, res, next) {
+  try {
+    const { email, code } = req.body || {};
+    if (!email || !code) {
+      return res.status(400).json({ message: 'Email and OTP are required.' });
+    }
+
+    const result = await authService.verifyResetOtp({ email, code });
+    return res.json(result);
+  } catch (error) {
+    return handleError(error, res, next);
+  }
+}
+
+async function resetPassword(req, res, next) {
+  try {
+    const { email, code, newPassword } = req.body || {};
+    if (!email || !code || !newPassword) {
+      return res.status(400).json({ message: 'Email, OTP code, and new password are required.' });
+    }
+
+    const result = await authService.resetPassword({ email, code, newPassword });
+    return res.json(result);
+  } catch (error) {
+    return handleError(error, res, next);
+  }
+}
+
 module.exports = {
   register,
   resend,
@@ -114,4 +156,7 @@ module.exports = {
   socialRegister,
   socialLogin,
   logout,
+  forgotPassword,
+  verifyResetOtp,
+  resetPassword,
 };

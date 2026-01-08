@@ -14,6 +14,7 @@ import '../models/shipping_method.dart';
 import '../models/shipping_method_service.dart';
 import '../models/voucher.dart';
 import '../models/voucher_service.dart';
+import '../utils/date_formatter.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/price_formatter.dart';
 import '../widgets/top_message.dart';
@@ -156,16 +157,12 @@ class _CheckoutPageState extends State<CheckoutPage> {
       return 'Nhận trong thời gian sớm nhất';
     }
     final now = DateTime.now();
-    final minDate = now.add(Duration(days: minDays));
-    final maxDate = now.add(Duration(days: maxDays));
+    final minDate = now.add(Duration(days: minDays)).toLocal();
+    final maxDate = now.add(Duration(days: maxDays)).toLocal();
     if (minDays == maxDays) {
-      return 'Nhận ngày ${_formatShippingDate(minDate)}';
+      return 'Nhận ngày ${DateFormatter.formatShippingDate(minDate)}';
     }
-    return 'Nhận từ ${_formatShippingDate(minDate)} - ${_formatShippingDate(maxDate)}';
-  }
-
-  String _formatShippingDate(DateTime date) {
-    return '${date.day} Tháng ${date.month}';
+    return 'Nhận từ ${DateFormatter.formatShippingDate(minDate)} - ${DateFormatter.formatShippingDate(maxDate)}';
   }
 
   double _itemPrice(CartItem item) {
@@ -182,7 +179,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
 
   double _currentShippingFee() {
     if (widget.items.isEmpty) return 0.0;
-    return _selectedShipping?.fee ?? 30000.0;
+    return _selectedShipping?.fee ?? 0.0;
   }
 
   Future<void> _loadDefaultPaymentMethod() async {
@@ -717,7 +714,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
     );
     final shippingFee = items.isEmpty
         ? 0.0
-        : (_selectedShipping?.fee ?? 30000.0);
+        : (_selectedShipping?.fee ?? 0.0);
     final discount = _calculateVoucherDiscount(
       _selectedProductVoucher,
       subtotal: subtotal,
@@ -732,13 +729,13 @@ class _CheckoutPageState extends State<CheckoutPage> {
     final total = (subtotal + shippingFee - totalDiscount)
         .clamp(0.0, double.infinity);
     final selectedAddress = _selectedAddress;
-    final shippingMinDays = _selectedShipping?.minDays ?? 5;
-    final shippingMaxDays = _selectedShipping?.maxDays ?? 6;
-    final shippingRange = _formatShippingRange(shippingMinDays, shippingMaxDays);
-    final shippingName =
-        _selectedShipping?.subtitle ?? 'Giao hàng tiêu chuẩn';
-    final shippingDescription = _selectedShipping?.description ??
-        'Nhận voucher trị giá 15.000đ nếu đơn hàng được giao đến bạn sau ngày 8 Tháng 1 2026.';
+    final shippingMinDays = _selectedShipping?.minDays ?? 0;
+    final shippingMaxDays = _selectedShipping?.maxDays ?? 0;
+    final shippingRange = _selectedShipping != null
+        ? _formatShippingRange(shippingMinDays, shippingMaxDays)
+        : '';
+    final shippingName = _selectedShipping?.subtitle ?? '';
+    final shippingDescription = _selectedShipping?.description ?? '';
 
     final voucherAccent = AppColors.orange600;
 
@@ -828,7 +825,7 @@ class _CheckoutPageState extends State<CheckoutPage> {
                                     .labelSmall
                                     ?.copyWith(fontSize: 11),
                               ),
-                              child: const Text('Thay \u0111\u1ed5i'),
+                              child: const Text('Thay đổi'),
                             ),
                           ],
                         ),
@@ -1040,67 +1037,80 @@ class _CheckoutPageState extends State<CheckoutPage> {
                     }
                   },
                   child: _SectionCard(
-                    title: 'Ph\u01b0\u01a1ng th\u1ee9c v\u1eadn chuy\u1ec3n',
+                    title: 'Phương thức vận chuyển',
                     trailing: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Xem t\u1ea5t c\u1ea3',
+                          'Xem tất cả',
                           style: TextStyle(fontSize: 10),
                         ),
                         SizedBox(width: 4),
                         Icon(Icons.chevron_right, size: 18),
                       ],
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.local_shipping,
-                              size: 18,
-                              color: AppColors.teal600,
-                            ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: Text(
-                                shippingRange,
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .bodySmall
-                                    ?.copyWith(
+                    child: _selectedShipping != null
+                        ? Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (shippingRange.isNotEmpty)
+                                Row(
+                                  children: [
+                                    Icon(
+                                      Icons.local_shipping,
+                                      size: 18,
                                       color: AppColors.teal600,
-                                      fontWeight: FontWeight.w600,
                                     ),
-                              ),
-                            ),
-                            Text(
-                              formatPrice(shippingFee),
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(fontWeight: FontWeight.w600),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          shippingName,
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          shippingDescription,
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodySmall
-                              ?.copyWith(color: AppColors.gray600),
-                        ),
-                      ],
-                    ),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        shippingRange,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: AppColors.teal600,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                      ),
+                                    ),
+                                    Text(
+                                      formatPrice(shippingFee),
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
+                              if (shippingName.isNotEmpty) ...[
+                                if (shippingRange.isNotEmpty) const SizedBox(height: 6),
+                                Text(
+                                  shippingName,
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                ),
+                              ],
+                              if (shippingDescription.isNotEmpty) ...[
+                                if (shippingName.isNotEmpty) const SizedBox(height: 4),
+                                Text(
+                                  shippingDescription,
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(color: AppColors.gray600),
+                                ),
+                              ],
+                            ],
+                          )
+                        : Text(
+                            'Chưa có',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(color: AppColors.gray500),
+                          ),
                   ),
                 ),
                 const SizedBox(height: 12),

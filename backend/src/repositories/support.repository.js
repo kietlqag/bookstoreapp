@@ -23,6 +23,7 @@ function mapSupportMessageRow(row) {
     requestId: row.requestId,
     message: row.message,
     isFromUser: row.isFromUser,
+    isRead: row.isRead ?? false,
     createdAt: row.createdAt,
   };
 }
@@ -51,15 +52,15 @@ async function createSupportMessage({
   isFromUser = true,
 }) {
   const result = await pool.query(
-    'INSERT INTO "SupportMessage" ("userId", message, "requestId", "isFromUser") '
-      + 'VALUES ($1, $2, $3, $4) RETURNING id, "userId", "requestId", message, "isFromUser", "createdAt"',
-    [userId, message, requestId, isFromUser],
+    'INSERT INTO "SupportMessage" ("userId", message, "requestId", "isFromUser", "isRead") '
+      + 'VALUES ($1, $2, $3, $4, $5) RETURNING id, "userId", "requestId", message, "isFromUser", "isRead", "createdAt"',
+    [userId, message, requestId, isFromUser, false], // New messages are unread by default
   );
   return mapSupportMessageRow(result.rows[0]);
 }
 
 async function findMessagesByUserId(userId, requestId = null) {
-  let query = 'SELECT id, "userId", "requestId", message, "isFromUser", "createdAt" '
+  let query = 'SELECT id, "userId", "requestId", message, "isFromUser", "isRead", "createdAt" '
     + 'FROM "SupportMessage" '
     + 'WHERE "userId" = $1';
   const params = [userId];
@@ -73,6 +74,66 @@ async function findMessagesByUserId(userId, requestId = null) {
 
   const result = await pool.query(query, params);
   return result.rows.map(mapSupportMessageRow);
+}
+
+// Get new messages after a specific timestamp (for polling)
+async function findNewMessagesAfter(afterTimestamp = null, afterId = null) {
+  let query = 'SELECT id, "userId", "requestId", message, "isFromUser", "isRead", "createdAt" '
+    + 'FROM "SupportMessage" '
+    + 'WHERE "isFromUser" = true'; // Chỉ lấy tin nhắn từ khách hàng
+  const params = [];
+
+  if (afterId) {
+    query += ' AND id > $1';
+    params.push(afterId);
+  } else if (afterTimestamp) {
+    query += ' AND "createdAt" > $1';
+    params.push(afterTimestamp);
+  }
+
+  query += ' ORDER BY "createdAt" ASC';
+
+  const result = await pool.query(query, params);
+  return result.rows.map(mapSupportMessageRow);
+}
+
+// Get messages for a specific user (for staff to view chat history)
+async function findMessagesByUserIdForStaff(userId) {
+  const query = 'SELECT id, "userId", "requestId", message, "isFromUser", "isRead", "createdAt" '
+    + 'FROM "SupportMessage" '
+    + 'WHERE "userId" = $1 '
+    + 'ORDER BY "createdAt" ASC';
+
+  const result = await pool.query(query, [userId]);
+  return result.rows.map(mapSupportMessageRow);
+}
+
+// Mark messages as read
+async function markMessagesAsRead(userId, messageIds = null) {
+  let query = 'UPDATE "SupportMessage" SET "isRead" = true WHERE "userId" = $1';
+  const params = [userId];
+
+  if (messageIds && messageIds.length > 0) {
+    query += ` AND id = ANY($2::int[])`;
+    params.push(messageIds);
+  } else {
+    // Mark all unread messages from staff (isFromUser = false) as read
+    query += ' AND "isFromUser" = false AND "isRead" = false';
+  }
+
+  query += ' RETURNING id';
+
+  const result = await pool.query(query, params);
+  return result.rows.map((row) => row.id);
+}
+
+// Get unread message count for a user
+async function getUnreadMessageCount(userId) {
+  const result = await pool.query(
+    'SELECT COUNT(*) FROM "SupportMessage" WHERE "userId" = $1 AND "isFromUser" = false AND "isRead" = false',
+    [userId],
+  );
+  return parseInt(result.rows[0].count, 10);
 }
 
 async function findRequestsByUserId(userId) {
@@ -134,11 +195,45 @@ async function findOrderSummary(orderId, userId) {
   };
 }
 
+// Get list of users who have sent support messages (for staff panel)
+async function findUsersWithMessages() {
+  const result = await pool.query(
+    `SELECT DISTINCT 
+      u.id AS "userId",
+      u."fullName",
+      u.email,
+      u."phoneNumber",
+      u.avatar,
+      COUNT(sm.id) AS "messageCount",
+      MAX(sm."createdAt") AS "lastMessageAt"
+    FROM "SupportMessage" sm
+    INNER JOIN "User" u ON u.id = sm."userId"
+    WHERE sm."isFromUser" = true
+    GROUP BY u.id, u."fullName", u.email, u."phoneNumber", u.avatar
+    ORDER BY MAX(sm."createdAt") DESC`,
+  );
+  
+  return result.rows.map((row) => ({
+    userId: row.userId,
+    fullName: row.fullName,
+    email: row.email,
+    phoneNumber: row.phoneNumber,
+    avatar: row.avatar,
+    messageCount: parseInt(row.messageCount, 10),
+    lastMessageAt: row.lastMessageAt,
+  }));
+}
+
 module.exports = {
   createSupportRequest,
   createSupportMessage,
   findMessagesByUserId,
+  findMessagesByUserIdForStaff,
+  findNewMessagesAfter,
   findRequestsByUserId,
   findRequestById,
   findOrderSummary,
+  findUsersWithMessages,
+  markMessagesAsRead,
+  getUnreadMessageCount,
 };

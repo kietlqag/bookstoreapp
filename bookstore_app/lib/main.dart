@@ -251,6 +251,7 @@ class _BookStoreAppState extends State<BookStoreApp> {
     ),
   ];
   List<Book> _books = List<Book>.from(_sampleBooks);
+  int _booksReloadCounter = 0;
 
   List<CartItem> _cartItems = [];
   Set<int> _favoriteIds = <int>{};
@@ -424,8 +425,10 @@ class _BookStoreAppState extends State<BookStoreApp> {
     try {
       final books = await _bookService.fetchBooks();
       if (!mounted || books.isEmpty) return;
+      // Always create a new list to ensure reference changes for proper UI updates
       setState(() {
-        _books = books;
+        _books = List<Book>.from(books);
+        _booksReloadCounter++; // Increment counter to force widget rebuild
       });
     } catch (_) {
       // Keep sample data when the backend is unavailable.
@@ -658,9 +661,12 @@ class _BookStoreAppState extends State<BookStoreApp> {
   void _openForgot() {
     _navigatorKey.currentState?.push(
       MaterialPageRoute(
-        builder: (_) => ForgotPasswordPage(onBack: () {
-              _navigatorKey.currentState?.pop();
-            }),
+        builder: (_) => ForgotPasswordPage(
+          baseUrl: _resolveBaseUrl(),
+          onBack: () {
+            _navigatorKey.currentState?.pop();
+          },
+        ),
       ),
     );
   }
@@ -700,7 +706,12 @@ class _BookStoreAppState extends State<BookStoreApp> {
               onIncreaseCart: _increaseCart,
               onDecreaseCart: _decreaseCart,
               onRemoveCart: _removeCart,
-              onOrderCompleted: _removeCartItemsLocal,
+              onOrderCompleted: (cartItemIds) {
+                _removeCartItemsLocal(cartItemIds);
+                // Reload books to update soldQuantity after order
+                _loadBooks();
+              },
+              onReloadBooks: _loadBooks,
               onToggleFavorite: _toggleFavorite,
               onLogout: _logout,
               userId: _session?.userId ?? 0,

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../models/shipping_method.dart';
 import '../models/shipping_method_service.dart';
+import '../utils/date_formatter.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/price_formatter.dart';
 
@@ -71,17 +72,14 @@ class _ShippingMethodPageState extends State<ShippingMethodPage> {
     if (minDays <= 0 && maxDays <= 0) {
       return 'Nhận trong thời gian sớm nhất';
     }
-    final minDate = start.add(Duration(days: minDays));
-    final maxDate = start.add(Duration(days: maxDays));
+    final minDate = start.add(Duration(days: minDays)).toLocal();
+    final maxDate = start.add(Duration(days: maxDays)).toLocal();
     if (minDays == maxDays) {
-      return 'Nhận ngày ${_formatDate(minDate)}';
+      return 'Nhận ngày ${DateFormatter.formatShippingDate(minDate)}';
     }
-    return 'Nhận từ ${_formatDate(minDate)} - ${_formatDate(maxDate)}';
+    return 'Nhận từ ${DateFormatter.formatShippingDate(minDate)} - ${DateFormatter.formatShippingDate(maxDate)}';
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.day} Tháng ${date.month}';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -340,7 +338,7 @@ class _BottomBar extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
           ),
-          child: const Text('OK'),
+          child: const Text('Xác nhận'),
         ),
       ),
     );

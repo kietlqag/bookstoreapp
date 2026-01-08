@@ -99,7 +99,7 @@ class _RegisterPageState extends State<RegisterPage> {
     } catch (error) {
       showTopMessage(
         context,
-        message: error.toString(),
+        message: 'Gửi mã OTP thất bại. Vui lòng thử lại sau.',
         type: TopMessageType.error,
       );
     } finally {
@@ -129,7 +129,7 @@ class _RegisterPageState extends State<RegisterPage> {
     } catch (error) {
       showTopMessage(
         context,
-        message: error.toString(),
+        message: 'Mã OTP không đúng hoặc đã hết hạn. Vui lòng thử lại.',
         type: TopMessageType.error,
       );
     } finally {
@@ -165,7 +165,7 @@ class _RegisterPageState extends State<RegisterPage> {
     } catch (error) {
       showTopMessage(
         context,
-        message: error.toString(),
+        message: 'Gửi lại mã OTP thất bại. Vui lòng thử lại sau.',
         type: TopMessageType.error,
       );
     } finally {
@@ -183,7 +183,7 @@ class _RegisterPageState extends State<RegisterPage> {
     } catch (error) {
       showTopMessage(
         context,
-        message: error.toString(),
+        message: 'Đăng ký thất bại. Vui lòng thử lại sau.',
         type: TopMessageType.error,
       );
     }

@@ -1,28 +1,44 @@
 ﻿const nodemailer = require('nodemailer');
 
 function createTransport() {
-  const host = process.env.SMTP_HOST;
+  const host = process.env.SMTP_HOST?.trim();
   const port = Number(process.env.SMTP_PORT || 587);
-  const user = process.env.SMTP_USER;
-  const pass = process.env.SMTP_PASS;
+  const user = process.env.SMTP_USER?.trim();
+  const pass = process.env.SMTP_PASS?.trim(); // Remove any whitespace that might be in .env
   const secure = String(process.env.SMTP_SECURE || 'false') === 'true';
 
   if (!host || !user || !pass) {
+    console.error('SMTP configuration missing. Required: SMTP_HOST, SMTP_USER, SMTP_PASS');
     return null;
   }
 
-  return nodemailer.createTransport({
+  // For Gmail, ensure proper configuration
+  const transportConfig = {
     host,
     port,
-    secure,
-    auth: { user, pass },
-  });
+    secure, // true for 465, false for other ports
+    auth: { 
+      user, 
+      pass 
+    },
+  };
+
+  // Add specific settings for Gmail
+  if (host === 'smtp.gmail.com') {
+    transportConfig.requireTLS = true;
+    transportConfig.connectionTimeout = 10000;
+    transportConfig.greetingTimeout = 10000;
+    transportConfig.socketTimeout = 10000;
+  }
+
+  return nodemailer.createTransport(transportConfig);
 }
 
 async function sendOtpEmail({ to, code }) {
   const transport = createTransport();
   if (!transport) {
-    const error = new Error('SMTP is not configured.');
+    console.error('SMTP is not configured. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS in .env file.');
+    const error = new Error('Email service chưa được cấu hình. Vui lòng liên hệ quản trị viên.');
     error.status = 500;
     throw error;
   }
@@ -54,13 +70,30 @@ async function sendOtpEmail({ to, code }) {
       <p style="text-align:center; color:#9ca3af; font-size:12px; margin-top:16px;">K-Book Team</p>
     </div>
   `;
-  await transport.sendMail({
-    from,
-    to,
-    subject,
-    text,
-    html,
-  });
+  
+  try {
+    await transport.verify();
+    await transport.sendMail({
+      from,
+      to,
+      subject,
+      text,
+      html,
+    });
+  } catch (error) {
+    // Improve error message for common Gmail issues
+    if (error.code === 'EAUTH' || error.command === 'AUTH PLAIN') {
+      if (error.response && error.response.includes('BadCredentials')) {
+        const authError = new Error('Lỗi xác thực email. Vui lòng kiểm tra lại cấu hình SMTP. Đối với Gmail, bạn cần sử dụng App Password (mật khẩu ứng dụng), không phải mật khẩu thông thường. Xem hướng dẫn trong file EMAIL_SETUP.md');
+        authError.status = 500;
+        throw authError;
+      }
+      const authError = new Error('Lỗi xác thực email. Vui lòng kiểm tra lại SMTP_USER và SMTP_PASS trong file .env. Đảm bảo bạn đang sử dụng App Password cho Gmail.');
+      authError.status = 500;
+      throw authError;
+    }
+    throw error;
+  }
 }
 
 module.exports = { sendOtpEmail };

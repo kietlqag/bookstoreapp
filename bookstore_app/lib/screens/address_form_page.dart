@@ -349,7 +349,7 @@ class _AddressFormPageState extends State<AddressFormPage> {
           _saving = false;
         });
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Khong lay duoc dia chi sau sap nhap.')),
+          const SnackBar(content: Text('Không thể lấy địa chỉ sau khi tìm kiếm.')),
         );
         return;
       }
@@ -381,7 +381,7 @@ class _AddressFormPageState extends State<AddressFormPage> {
         _saving = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Luu dia chi that bai.')),
+        const SnackBar(content: Text('Lưu địa chỉ thất bại.')),
       );
     }
   }
@@ -404,7 +404,7 @@ class _AddressFormPageState extends State<AddressFormPage> {
         _saving = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Xoa dia chi that bai.')),
+        const SnackBar(content: Text('Xóa địa chỉ thất bại.')),
       );
     }
   }

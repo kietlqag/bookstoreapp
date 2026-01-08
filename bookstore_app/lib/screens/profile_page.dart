@@ -20,11 +20,13 @@ class ProfilePage extends StatefulWidget {
     required this.onLogout,
     required this.userId,
     required this.token,
+    this.reloadNotifier,
   });
 
   final VoidCallback onLogout;
   final int userId;
   final String token;
+  final ValueNotifier<bool>? reloadNotifier;
 
   @override
   State<ProfilePage> createState() => _ProfilePageState();
@@ -52,6 +54,20 @@ class _ProfilePageState extends State<ProfilePage> {
   void initState() {
     super.initState();
     _loadSummary();
+    // Listen to reload notifier if provided
+    widget.reloadNotifier?.addListener(_onReloadRequested);
+  }
+  
+  @override
+  void dispose() {
+    widget.reloadNotifier?.removeListener(_onReloadRequested);
+    super.dispose();
+  }
+  
+  void _onReloadRequested() {
+    if (mounted) {
+      _loadSummary();
+    }
   }
 
   Future<void> _loadSummary() async {
@@ -300,8 +316,8 @@ class _ProfilePageState extends State<ProfilePage> {
                   child: Column(
                     children: [
                       InkWell(
-                        onTap: () {
-                          Navigator.push(
+                        onTap: () async {
+                          await Navigator.push(
                             context,
                             MaterialPageRoute<void>(
                               builder: (_) => OrderListPage(
@@ -310,6 +326,10 @@ class _ProfilePageState extends State<ProfilePage> {
                               ),
                             ),
                           );
+                          // Reload summary when returning to update badge counts
+                          if (mounted) {
+                            _loadSummary();
+                          }
                         },
                         borderRadius: BorderRadius.circular(12),
                         child: Padding(
@@ -401,8 +421,8 @@ class _ProfilePageState extends State<ProfilePage> {
                             icon: Icons.star_border,
                             label: 'Đánh giá',
                             badgeCount: summary?.reviewPendingCount ?? 0,
-                            onTap: () {
-                              Navigator.push(
+                            onTap: () async {
+                              await Navigator.push(
                                 context,
                                 MaterialPageRoute<void>(
                                   builder: (_) => ReviewListPage(
@@ -411,6 +431,10 @@ class _ProfilePageState extends State<ProfilePage> {
                                   ),
                                 ),
                               );
+                              // Reload summary when returning to update badge counts
+                              if (mounted) {
+                                _loadSummary();
+                              }
                             },
                           ),
                         ],

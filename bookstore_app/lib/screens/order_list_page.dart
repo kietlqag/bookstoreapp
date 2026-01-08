@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../models/order.dart';
 import '../models/order_service.dart';
+import '../utils/date_formatter.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/price_formatter.dart';
 import 'order_detail_page.dart';
@@ -239,7 +240,7 @@ class _OrderCardState extends State<_OrderCard> {
     final order = widget.order;
     final statusText = _mapStatus(order.status);
     final dateText = order.orderDate != null
-        ? '${order.orderDate!.day}/${order.orderDate!.month}/${order.orderDate!.year}'
+        ? DateFormatter.formatDate(order.orderDate!.toLocal())
         : '--/--/----';
     final item = order.items.isNotEmpty ? order.items.first : null;
     final itemTitle = item?.bookTitle.isNotEmpty == true
@@ -264,7 +265,11 @@ class _OrderCardState extends State<_OrderCard> {
         final updated = await Navigator.push<bool>(
           context,
           MaterialPageRoute<bool>(
-            builder: (_) => OrderDetailPage(order: order, userId: widget.userId),
+            builder: (_) => OrderDetailPage(
+              order: order,
+              userId: widget.userId,
+              onOrderUpdated: () {},
+            ),
           ),
         );
         if (updated == true) {
@@ -433,12 +438,10 @@ class _OrderCardState extends State<_OrderCard> {
         return 'Chờ giao hàng';
       case 'delivered':
         return 'Đã giao';
-      case 'returning':
-        return 'Trả hàng';
-      case 'refunding':
-        return 'Hoàn tiền';
       case 'cancelled':
         return 'Đã hủy';
+      case 'processing':
+        return 'Đang xử lý';
       default:
         return status;
     }

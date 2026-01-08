@@ -294,6 +294,7 @@ CREATE TABLE IF NOT EXISTS "SupportMessage" (
   "requestId" INTEGER,
   message TEXT NOT NULL,
   "isFromUser" BOOLEAN NOT NULL DEFAULT true,
+  "isRead" BOOLEAN NOT NULL DEFAULT false,
   "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
   CONSTRAINT fk_support_message_user
     FOREIGN KEY ("userId") REFERENCES "User"(id) ON DELETE CASCADE,
@@ -313,9 +314,15 @@ CREATE INDEX IF NOT EXISTS "idx_support_message_user"
 CREATE INDEX IF NOT EXISTS "idx_support_message_request"
   ON "SupportMessage" ("requestId");
 
+CREATE INDEX IF NOT EXISTS "idx_support_message_read"
+  ON "SupportMessage" ("userId", "isRead");
+
+CREATE INDEX IF NOT EXISTS "idx_support_message_created"
+  ON "SupportMessage" ("createdAt" DESC);
+
 INSERT INTO "PaymentMethod" (code, title, provider, "methodType", "sortOrder")
 VALUES
-  ('MOMO', 'MoMo', 'momo', 'redirect', 2),
-  ('VIETQR', 'VietQR', 'vietqr', 'qr', 3),
-  ('COD', 'Thanh toan khi nhan hang', 'cod', 'offline', 0)
+  ('MOMO', 'Thanh toán với MoMo', 'momo', 'redirect', 2),
+  ('VIETQR', 'Thanh toán với VietQR', 'vietqr', 'qr', 3),
+  ('COD', 'Thanh toán khi nhận hàng', 'cod', 'offline', 1)
 ON CONFLICT (code) DO NOTHING;

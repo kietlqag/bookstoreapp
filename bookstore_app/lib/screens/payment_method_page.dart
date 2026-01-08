@@ -284,7 +284,7 @@ class _BottomBar extends StatelessWidget {
               borderRadius: BorderRadius.circular(12),
             ),
           ),
-          child: const Text('OK'),
+          child: const Text('Xác nhận'),
         ),
       ),
     );

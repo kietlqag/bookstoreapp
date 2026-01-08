@@ -1,10 +1,11 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import '../models/book.dart';
 import '../models/book_service.dart';
 import '../models/cart_item.dart';
 import '../models/review.dart';
 import '../models/review_service.dart';
+import '../utils/date_formatter.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/header.dart';
 import '../widgets/price_formatter.dart';
@@ -226,7 +227,7 @@ class _BookDetailPageState extends State<BookDetailPage> {
                     } catch (error) {
                       showTopMessage(
                         context,
-                        message: error.toString(),
+                        message: 'Đã xảy ra lỗi. Vui lòng thử lại sau.',
                         type: TopMessageType.error,
                       );
                     }
@@ -617,25 +618,44 @@ class _ReviewList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sampleReview = Review(
-      id: 0,
-      bookId: 0,
-      userName: 'Kh�ch h�ng',
-      rating: 5,
-      comment: 'S�ch hay, n?i dung d? hi?u. M�nh r?t h�i l�ng.',
-      images: const [
-        'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&w=400&q=80',
-      ],
-      videos: const [
-        'https://sample-videos.com/video321/mp4/720/big_buck_bunny_720p_1mb.mp4',
-      ],
-      createdAt: null,
-    );
-    final displayReviews = reviews.isEmpty ? [sampleReview] : reviews;
+    if (reviews.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 48),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.rate_review_outlined,
+              size: 64,
+              color: AppColors.gray300,
+            ),
+            const SizedBox(height: 16),
+            Text(
+              'Chưa có đánh giá',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleMedium
+                  ?.copyWith(
+                    color: AppColors.gray600,
+                    fontWeight: FontWeight.w600,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Hãy là người đầu tiên đánh giá sản phẩm này',
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(color: AppColors.gray500),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      );
+    }
 
     return Column(
-      children: displayReviews.map((review) {
-        final isSample = review.id == 0 && reviews.isEmpty;
+      children: reviews.map((review) {
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 12),
           decoration: const BoxDecoration(
@@ -650,6 +670,10 @@ class _ReviewList extends StatelessWidget {
                   review.userName.isNotEmpty
                       ? review.userName.substring(0, 1).toUpperCase()
                       : 'U',
+                  style: const TextStyle(
+                    color: AppColors.gray700,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -660,16 +684,16 @@ class _ReviewList extends StatelessWidget {
                     Text(
                       review.userName.isNotEmpty
                           ? review.userName
-                          : 'Ngu?i d�ng',
+                          : 'Người dùng',
                       style: Theme.of(context)
                           .textTheme
                           .bodyMedium
                           ?.copyWith(fontWeight: FontWeight.w600),
                     ),
-                    if (isSample) ...[
+                    if (review.createdAt != null) ...[
                       const SizedBox(height: 2),
                       Text(
-                        '��nh gi� m?u',
+                        DateFormatter.formatRelativeTime(review.createdAt!),
                         style: Theme.of(context)
                             .textTheme
                             .labelSmall

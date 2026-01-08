@@ -59,7 +59,7 @@ class _CategoryBooksPageState extends State<CategoryBooksPage> {
     } catch (error) {
       showTopMessage(
         context,
-        message: error.toString(),
+        message: 'Đã xảy ra lỗi. Vui lòng thử lại sau.',
         type: TopMessageType.error,
       );
     }

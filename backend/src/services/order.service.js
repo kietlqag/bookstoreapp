@@ -1,5 +1,6 @@
 ﻿const orderRepository = require('../repositories/order.repository');
 const { toOrderResponse } = require('../models/order.model');
+const notificationService = require('./notification.service');
 
 async function createOrder({
   userId,
@@ -57,6 +58,27 @@ async function createOrder({
     shippingVoucherId,
     productVoucherId,
   });
+
+  // Create notification for order success
+  try {
+    const itemCount = items.length;
+    const firstItem = order.items && order.items.length > 0 ? order.items[0] : null;
+    const itemNames = order.items
+      ? order.items.slice(0, 3).map((item) => item.bookTitle || 'Sản phẩm').join(', ')
+      : '';
+    const moreText = itemCount > 3 ? ` và ${itemCount - 3} sản phẩm khác` : '';
+
+    await notificationService.createNotification({
+      userId,
+      type: 'order',
+      title: 'Đặt hàng thành công',
+      message: `Đơn hàng #${order.id} đã được đặt thành công. ${itemNames}${moreText}.`,
+      relatedId: order.id.toString(),
+    });
+  } catch (error) {
+    // Don't fail order creation if notification fails
+    console.error('Failed to create order notification:', error);
+  }
 
   return { id: order.id };
 }

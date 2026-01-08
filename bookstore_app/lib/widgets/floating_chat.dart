@@ -790,12 +790,13 @@ class _FloatingChatWidgetState extends State<FloatingChatWidget>
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: AppColors.gray200),
         ),
+        constraints: const BoxConstraints(maxWidth: double.infinity),
         child: Row(
           children: [
             // Hình ảnh sách
             Container(
-              width: 50,
-              height: 50,
+              width: 45,
+              height: 45,
               decoration: BoxDecoration(
                 color: AppColors.gray100,
                 borderRadius: BorderRadius.circular(8),
@@ -809,61 +810,75 @@ class _FloatingChatWidgetState extends State<FloatingChatWidget>
                       errorWidget: (_, __, ___) => const Icon(
                         Icons.book_outlined,
                         color: AppColors.gray400,
-                        size: 24,
+                        size: 20,
                       ),
                     )
                   : const Icon(
                       Icons.book_outlined,
                       color: AppColors.gray400,
-                      size: 24,
+                      size: 20,
                     ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
             // Thông tin sách
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
                     book.title,
                     style: const TextStyle(
-                      fontSize: 13,
+                      fontSize: 11,
                       fontWeight: FontWeight.w600,
                       color: AppColors.gray900,
+                      height: 1.2,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 2),
                   Text(
                     book.author,
                     style: const TextStyle(
-                      fontSize: 11,
+                      fontSize: 9,
                       color: AppColors.gray600,
+                      height: 1.2,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(height: 4),
+                  const SizedBox(height: 3),
                   Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       if (book.discount > 0) ...[
-                        Text(
-                          formatPrice(book.price),
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.gray500,
-                            decoration: TextDecoration.lineThrough,
+                        Flexible(
+                          child: Text(
+                            formatPrice(book.price),
+                            style: const TextStyle(
+                              fontSize: 9,
+                              color: AppColors.gray500,
+                              decoration: TextDecoration.lineThrough,
+                              height: 1.2,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
-                        const SizedBox(width: 6),
+                        const SizedBox(width: 4),
                       ],
-                      Text(
-                        formatPrice(finalPrice),
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.orange600,
+                      Flexible(
+                        child: Text(
+                          formatPrice(finalPrice),
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.orange600,
+                            height: 1.2,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
@@ -871,10 +886,11 @@ class _FloatingChatWidgetState extends State<FloatingChatWidget>
                 ],
               ),
             ),
+            const SizedBox(width: 4),
             const Icon(
               Icons.chevron_right,
               color: AppColors.gray400,
-              size: 20,
+              size: 16,
             ),
           ],
         ),

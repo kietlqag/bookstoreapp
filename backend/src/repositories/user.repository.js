@@ -92,8 +92,6 @@ async function findProfileStats(userId) {
       + 'AND status = \'delivered\' AND "isReviewed" = false) '
       + 'AS "reviewPendingCount", '
       + '(SELECT COUNT(*) FROM "Order" WHERE "userId" = $1 '
-      + 'AND status = \'returning\') AS "returningCount", '
-      + '(SELECT COUNT(*) FROM "Order" WHERE "userId" = $1 '
       + 'AND status = \'cancelled\') AS "cancelledCount", '
       + '(SELECT COALESCE(SUM(oi.quantity), 0) '
       + 'FROM "OrderItem" oi '
@@ -111,6 +109,14 @@ async function findProfileStats(userId) {
   return result.rows[0] || null;
 }
 
+async function updatePasswordByEmail({ email, passwordHash }) {
+  const result = await pool.query(
+    'UPDATE "User" SET "passwordHash" = $1 WHERE email = $2 RETURNING id',
+    [passwordHash, email],
+  );
+  return result.rows[0] || null;
+}
+
 module.exports = {
   findByEmail,
   findByPhone,
@@ -121,4 +127,5 @@ module.exports = {
   findPublicById,
   findProfileStats,
   updateProfile,
+  updatePasswordByEmail,
 };

@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../models/notification_service.dart';
+import '../models/order_service.dart';
+import '../models/order.dart';
+import '../utils/date_formatter.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/header.dart';
+import 'order_detail_page.dart';
 
 class NotificationDetailPage extends StatefulWidget {
   const NotificationDetailPage({
@@ -10,6 +14,7 @@ class NotificationDetailPage extends StatefulWidget {
     required this.notification,
     required this.baseUrl,
     required this.token,
+    required this.userId,
     this.onMarkAsRead,
     this.onDelete,
   });
@@ -17,6 +22,7 @@ class NotificationDetailPage extends StatefulWidget {
   final NotificationItem notification;
   final String baseUrl;
   final String token;
+  final int userId;
   final VoidCallback? onMarkAsRead;
   final VoidCallback? onDelete;
 
@@ -26,11 +32,63 @@ class NotificationDetailPage extends StatefulWidget {
 
 class _NotificationDetailPageState extends State<NotificationDetailPage> {
   late bool _isRead;
+  late final OrderService _orderService = OrderService(baseUrl: widget.baseUrl);
+  OrderSummary? _order;
 
   @override
   void initState() {
     super.initState();
     _isRead = widget.notification.isRead;
+    // Load order if notification is order type
+    debugPrint('[NotificationDetail] Notification type: ${widget.notification.type}');
+    debugPrint('[NotificationDetail] Notification relatedId: ${widget.notification.relatedId}');
+    debugPrint('[NotificationDetail] Notification type enum: ${widget.notification.notificationType}');
+    // Try to load order if relatedId exists (could be order notification)
+    if (widget.notification.relatedId != null && widget.notification.relatedId!.isNotEmpty) {
+      // Check if relatedId is a number (likely order ID)
+      final orderId = int.tryParse(widget.notification.relatedId!);
+      if (orderId != null) {
+        _loadOrder();
+      } else {
+        debugPrint('[NotificationDetail] relatedId is not a valid order ID: ${widget.notification.relatedId}');
+      }
+    } else {
+      debugPrint('[NotificationDetail] Skipping order load - no relatedId');
+    }
+  }
+
+  Future<void> _loadOrder() async {
+    final orderIdStr = widget.notification.relatedId;
+    if (orderIdStr == null || orderIdStr.isEmpty) {
+      debugPrint('[NotificationDetail] relatedId is null or empty');
+      return;
+    }
+    
+    final orderId = int.tryParse(orderIdStr);
+    if (orderId == null) {
+      debugPrint('[NotificationDetail] Cannot parse relatedId to int: $orderIdStr');
+      return;
+    }
+    
+    debugPrint('[NotificationDetail] Loading order ID: $orderId for user: ${widget.userId}');
+    try {
+      final order = await _orderService.fetchOrder(
+        orderId: orderId,
+        userId: widget.userId,
+      );
+      debugPrint('[NotificationDetail] Order loaded: ${order != null ? "Success" : "Null"}');
+      if (order != null) {
+        debugPrint('[NotificationDetail] Order has ${order.items.length} items');
+      }
+      if (mounted) {
+        setState(() {
+          _order = order;
+        });
+      }
+    } catch (e) {
+      debugPrint('[NotificationDetail] Error loading order: $e');
+      // Order not found or error
+    }
   }
 
   Future<void> _handleMarkAsRead() async {
@@ -60,7 +118,7 @@ class _NotificationDetailPageState extends State<NotificationDetailPage> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Lỗi: ${error.toString()}'),
+            content: Text('Đã xảy ra lỗi: ${error.toString()}'),
             duration: const Duration(seconds: 2),
             behavior: SnackBarBehavior.floating,
           ),
@@ -106,7 +164,7 @@ class _NotificationDetailPageState extends State<NotificationDetailPage> {
                 if (!mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text('Lỗi: ${error.toString()}'),
+                    content: Text('Đã xảy ra lỗi: ${error.toString()}'),
                     duration: const Duration(seconds: 2),
                     behavior: SnackBarBehavior.floating,
                   ),
@@ -149,22 +207,6 @@ class _NotificationDetailPageState extends State<NotificationDetailPage> {
     }
   }
 
-  String _formatTime(DateTime time) {
-    final now = DateTime.now();
-    final difference = now.difference(time);
-
-    if (difference.inMinutes < 1) {
-      return 'Vừa xong';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes} phút trước';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours} giờ trước';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} ngày trước';
-    } else {
-      return '${time.day}/${time.month}/${time.year} ${time.hour}:${time.minute.toString().padLeft(2, '0')}';
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -231,7 +273,7 @@ class _NotificationDetailPageState extends State<NotificationDetailPage> {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                _formatTime(widget.notification.createdAt),
+                                DateFormatter.formatRelativeTime(widget.notification.createdAt),
                                 style: Theme.of(context)
                                     .textTheme
                                     .bodySmall
@@ -269,6 +311,38 @@ class _NotificationDetailPageState extends State<NotificationDetailPage> {
                             ),
                       ),
                     ),
+                    // Show order card if we have relatedId (could be order)
+                    if (widget.notification.relatedId != null &&
+                        int.tryParse(widget.notification.relatedId!) != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 16),
+                        child: _order != null
+                            ? _buildOrderCard(_order!)
+                            : Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: AppColors.gray50,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: AppColors.gray200, width: 1),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const SizedBox(
+                                      width: 16,
+                                      height: 16,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Text(
+                                      'Đang tải thông tin đơn hàng...',
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                            color: AppColors.gray600,
+                                          ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                      ),
                     const SizedBox(height: 24),
                     // Các nút hành động
                     Row(
@@ -360,6 +434,129 @@ class _NotificationDetailPageState extends State<NotificationDetailPage> {
                 ),
               ),
             ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOrderCard(OrderSummary order) {
+    if (order.items.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    // Show first 3 items
+    final displayItems = order.items.take(3).toList();
+    final remainingCount = order.items.length - displayItems.length;
+    
+    return InkWell(
+      onTap: () {
+        // Navigate to order detail page when card is clicked
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (context) => OrderDetailPage(
+              order: order,
+              userId: widget.userId,
+            ),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.gray50,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.gray200, width: 1),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.receipt_long_outlined,
+                  size: 18,
+                  color: AppColors.orange600,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'Đơn hàng #${order.id}',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.orange600,
+                      ),
+                ),
+                const Spacer(),
+                Icon(
+                  Icons.chevron_right,
+                  size: 20,
+                  color: AppColors.gray400,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...displayItems.map((item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Row(
+                    children: [
+                      // Product image
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          item.bookImageUrl ?? '',
+                          width: 50,
+                          height: 50,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) => Container(
+                            width: 50,
+                            height: 50,
+                            color: AppColors.gray200,
+                            child: const Icon(Icons.book, size: 24),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // Product info
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              item.bookTitle ?? 'Sản phẩm',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w500,
+                                    color: AppColors.gray900,
+                                  ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Số lượng: ${item.quantity}',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: AppColors.gray600,
+                                    fontSize: 12,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                )),
+            if (remainingCount > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  'và $remainingCount sản phẩm khác',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppColors.gray600,
+                        fontSize: 12,
+                        fontStyle: FontStyle.italic,
+                      ),
+                ),
+              ),
           ],
         ),
       ),

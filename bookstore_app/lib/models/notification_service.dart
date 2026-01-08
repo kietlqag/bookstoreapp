@@ -20,7 +20,7 @@ class NotificationItem {
   final String title;
   final String message;
   final bool isRead;
-  final int? relatedId;
+  final String? relatedId;
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -45,7 +45,7 @@ class NotificationItem {
       title: json['title'] as String,
       message: json['message'] as String,
       isRead: json['isRead'] as bool,
-      relatedId: json['relatedId'] as int?,
+      relatedId: json['relatedId']?.toString(),
       createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
       updatedAt: json['updatedAt'] != null
           ? DateTime.parse(json['updatedAt'] as String).toLocal()

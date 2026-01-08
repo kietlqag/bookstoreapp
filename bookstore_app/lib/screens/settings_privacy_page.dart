@@ -445,7 +445,7 @@ class _SettingsPrivacyPageState extends State<SettingsPrivacyPage> {
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: $e')),
+        SnackBar(content: Text('Đã xảy ra lỗi: $e')),
       );
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -726,7 +726,7 @@ support@kbook.vn
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi: $e')),
+        SnackBar(content: Text('Đã xảy ra lỗi: $e')),
       );
     } finally {
       if (mounted) setState(() => _loading = false);

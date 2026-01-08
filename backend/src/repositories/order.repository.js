@@ -95,8 +95,21 @@ async function createOrderWithItems({
       }
     }
 
+    // Get order items with book info for notification
+    const itemsResult = await client.query(
+      'SELECT oi.*, b.title AS "bookTitle", b."imageUrl" AS "bookImageUrl", '
+        + 'b.author AS "bookAuthor" '
+        + 'FROM "OrderItem" oi '
+        + 'LEFT JOIN "Book" b ON b.id = oi."bookId" '
+        + 'WHERE oi."orderId" = $1',
+      [order.id],
+    );
+
     await client.query('COMMIT');
-    return order;
+    return {
+      ...order,
+      items: itemsResult.rows,
+    };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

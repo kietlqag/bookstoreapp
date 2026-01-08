@@ -23,7 +23,10 @@ class Review {
     DateTime? parsedDate;
     final createdAt = json['createdAt'];
     if (createdAt is String) {
-      parsedDate = DateTime.tryParse(createdAt);
+      final parsed = DateTime.tryParse(createdAt);
+      if (parsed != null) {
+        parsedDate = parsed.toLocal();
+      }
     }
     double parseDouble(dynamic value) {
       if (value is num) {

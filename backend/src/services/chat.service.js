@@ -56,11 +56,22 @@ Nếu không có sách hoặc voucher để đề xuất:
   "voucherCodes": []
 }`;
 
-// Kiểm tra xem message có liên quan đến sách không
+// Kiểm tra xem message có liên quan đến sách không (hỗ trợ cả tiếng Việt có dấu và không dấu)
 function isBookRelated(message) {
-  const lowerMessage = message.toLowerCase();
-  const bookIndicators = ['sách', 'book', 'cuốn', 'quyển', 'tác giả', 'tác phẩm'];
-  return bookIndicators.some(indicator => lowerMessage.includes(indicator));
+  // Chuẩn hóa về không dấu để dễ so sánh
+  const normalizeVietnamese = (str) => {
+    return str
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase();
+  };
+  
+  const normalizedMessage = normalizeVietnamese(message);
+  const bookIndicators = ['sách', 'sach', 'book', 'cuốn', 'cuon', 'quyển', 'quyen', 'tác giả', 'tac gia', 'tác phẩm', 'tac pham', 'mua', 'mua sach', 'mua sách', 'tim sach', 'tìm sách'];
+  return bookIndicators.some(indicator => {
+    const normalizedIndicator = normalizeVietnamese(indicator);
+    return normalizedMessage.includes(normalizedIndicator);
+  });
 }
 
 // Kiểm tra xem message có liên quan đến voucher không
@@ -86,13 +97,15 @@ async function chatWithAI(messages) {
   
   console.log(`[Chat] isBookQuery=${isBookQuery}, isVoucherQuery=${isVoucherQuery}, userMessage="${userMessage}"`);
   
-  // Load tất cả sách nếu liên quan đến sách
+  // Load tất cả sách nếu liên quan đến sách - LUÔN load để GPT có thể phân tích
   if (isBookQuery) {
     try {
       allBooks = await bookService.listBooks();
       console.log(`[Chat] Loaded ${allBooks.length} books for GPT to analyze`);
       if (allBooks.length === 0) {
         console.log(`[Chat] Warning: bookService.listBooks() returned empty array`);
+      } else {
+        console.log(`[Chat] Sample book IDs (first 5): ${allBooks.slice(0, 5).map(b => b.id).join(', ')}`);
       }
     } catch (error) {
       console.error('[Chat] Error loading books:', error);
@@ -131,7 +144,9 @@ async function chatWithAI(messages) {
    - Giá: ${book.price}đ`;
     }).join('\n\n');
     
-    enhancedSystemPrompt += `\n\nDanh sách sách hiện có trong cửa hàng (${allBooks.length} sách):\n\n${booksInfo}\n\nKhi khách hàng hỏi về sách, hãy phân tích yêu cầu dựa trên: tiêu đề, tác giả, danh mục, và đặc biệt là MÔ TẢ của sách để chọn ra các sách phù hợp nhất từ danh sách trên.`;
+    // Liệt kê tất cả IDs có sẵn để GPT chỉ đề xuất IDs thực tế
+    const availableIds = allBooks.map(b => b.id).join(', ');
+    enhancedSystemPrompt += `\n\nDanh sách sách hiện có trong cửa hàng (${allBooks.length} sách):\n\n${booksInfo}\n\n⚠️ QUAN TRỌNG: Bạn CHỈ được đề xuất các bookIds thực tế có trong danh sách trên. Các ID có sẵn là: [${availableIds}]. KHÔNG được đề xuất ID không tồn tại. Nếu KHÔNG có sách phù hợp trong danh sách, hãy để bookIds = [].\n\nKhi khách hàng hỏi về sách, hãy phân tích yêu cầu dựa trên: tiêu đề, tác giả, danh mục, và đặc biệt là MÔ TẢ của sách để chọn ra các sách phù hợp nhất từ danh sách trên.`;
     hasDataToShow = true;
   }
   
@@ -221,6 +236,8 @@ async function chatWithAI(messages) {
           let content =
             response.choices?.[0]?.message?.content || 'Xin lỗi, tôi không thể trả lời câu hỏi này.';
           
+          console.log(`[Chat] Raw GPT response content (first 500 chars): ${content.substring(0, 500)}`);
+          
           // Phân tích response từ GPT để lấy message, bookIds và voucherCodes
           let suggestedBookIds = [];
           let suggestedVoucherCodes = [];
@@ -234,78 +251,141 @@ async function chatWithAI(messages) {
             
             // Thử parse JSON
             const parsed = JSON.parse(jsonContent);
+            console.log(`[Chat] Parsed JSON successfully:`, JSON.stringify(parsed).substring(0, 200));
+            
             if (parsed.message) {
               message = parsed.message;
             }
-            if (parsed.bookIds && Array.isArray(parsed.bookIds)) {
-              suggestedBookIds = parsed.bookIds.slice(0, 5); // Giới hạn 5 sách
+            
+            // Parse bookIds - xử lý nhiều trường hợp
+            if (parsed.bookIds !== null && parsed.bookIds !== undefined) {
+              if (Array.isArray(parsed.bookIds)) {
+                suggestedBookIds = parsed.bookIds
+                  .filter(id => id != null && id !== '')
+                  .map(id => typeof id === 'string' ? parseInt(id, 10) : id)
+                  .filter(id => !isNaN(id) && id > 0)
+                  .slice(0, 5);
+              } else if (typeof parsed.bookIds === 'number') {
+                suggestedBookIds = [parsed.bookIds];
+              } else if (typeof parsed.bookIds === 'string') {
+                // Thử parse string như "[1,2,3]"
+                try {
+                  const parsedArray = JSON.parse(parsed.bookIds);
+                  if (Array.isArray(parsedArray)) {
+                    suggestedBookIds = parsedArray
+                      .map(id => typeof id === 'string' ? parseInt(id, 10) : id)
+                      .filter(id => !isNaN(id) && id > 0)
+                      .slice(0, 5);
+                  }
+                } catch (_) {
+                  // Ignore parse error
+                }
+              }
             }
-            if (parsed.voucherCodes && Array.isArray(parsed.voucherCodes)) {
-              suggestedVoucherCodes = parsed.voucherCodes.slice(0, 5); // Giới hạn 5 voucher
+            
+            // Parse voucherCodes
+            if (parsed.voucherCodes !== null && parsed.voucherCodes !== undefined) {
+              if (Array.isArray(parsed.voucherCodes)) {
+                suggestedVoucherCodes = parsed.voucherCodes
+                  .filter(code => code != null && code !== '')
+                  .slice(0, 5);
+              }
             }
-            console.log(`[Chat] Parsed JSON: message length=${message.length}, bookIds=${suggestedBookIds.length}, voucherCodes=${suggestedVoucherCodes.length}`);
+            
+            console.log(`[Chat] Parsed JSON: message="${message.substring(0, 50)}...", bookIds=[${suggestedBookIds.join(', ')}] (length=${suggestedBookIds.length}), voucherCodes=[${suggestedVoucherCodes.join(', ')}]`);
+            console.log(`[Chat] Full parsed object keys: ${Object.keys(parsed).join(', ')}`);
+            if (parsed.bookIds !== undefined) {
+              console.log(`[Chat] parsed.bookIds type: ${typeof parsed.bookIds}, value: ${JSON.stringify(parsed.bookIds)}`);
+            } else {
+              console.log(`[Chat] parsed.bookIds is undefined`);
+            }
           } catch (parseError) {
+            console.log(`[Chat] First JSON parse failed: ${parseError.message}`);
             // Nếu không parse được JSON, thử tìm JSON trong text
             try {
               const jsonMatch = content.match(/\{[\s\S]*\}/);
               if (jsonMatch) {
                 const parsed = JSON.parse(jsonMatch[0]);
+                console.log(`[Chat] Parsed JSON from text match:`, JSON.stringify(parsed).substring(0, 200));
+                
                 if (parsed.message) {
                   message = parsed.message;
                 }
                 if (parsed.bookIds && Array.isArray(parsed.bookIds)) {
-                  suggestedBookIds = parsed.bookIds.slice(0, 5);
+                  suggestedBookIds = parsed.bookIds
+                    .filter(id => id != null && id !== '')
+                    .map(id => typeof id === 'string' ? parseInt(id, 10) : id)
+                    .filter(id => !isNaN(id) && id > 0)
+                    .slice(0, 5);
                 }
                 if (parsed.voucherCodes && Array.isArray(parsed.voucherCodes)) {
                   suggestedVoucherCodes = parsed.voucherCodes.slice(0, 5);
                 }
-                console.log(`[Chat] Parsed JSON from text: message length=${message.length}, bookIds=${suggestedBookIds.length}, voucherCodes=${suggestedVoucherCodes.length}`);
+                console.log(`[Chat] Parsed JSON from text: bookIds=[${suggestedBookIds.join(', ')}], voucherCodes=[${suggestedVoucherCodes.join(', ')}]`);
               } else {
-                console.log('[Chat] Response is not JSON, using plain message');
+                console.log('[Chat] No JSON found in response, using plain message');
+                console.log(`[Chat] Response content (first 200 chars): ${content.substring(0, 200)}`);
               }
             } catch (secondParseError) {
-              console.log('[Chat] Failed to parse JSON, using plain message');
+              console.log(`[Chat] Second JSON parse also failed: ${secondParseError.message}`);
+              console.log(`[Chat] Response content (first 200 chars): ${content.substring(0, 200)}`);
             }
           }
           
-          // Lấy thông tin sách từ bookIds (chỉ đề xuất khi GPT thực sự đề xuất và tìm thấy)
+          // Lấy thông tin sách từ bookIds
           let suggestedBooks = [];
-          if (suggestedBookIds.length > 0) {
+          if (isBookQuery) {
+            // Đảm bảo allBooks đã được load
             if (allBooks.length === 0) {
-              console.log(`[Chat] Warning: No books loaded but GPT suggested IDs: ${suggestedBookIds.join(', ')}`);
-              console.log(`[Chat] Debug: isBookQuery=${isBookQuery}, userMessage="${userMessage}"`);
-              // Load sách nếu chưa load (chỉ khi GPT đã đề xuất IDs)
+              console.log(`[Chat] No books loaded, attempting to load...`);
               try {
-                console.log(`[Chat] Attempting to load books since GPT suggested IDs...`);
                 allBooks = await bookService.listBooks();
                 console.log(`[Chat] Loaded ${allBooks.length} books`);
-              } catch (fallbackError) {
-                console.error('[Chat] Error loading books:', fallbackError);
+              } catch (loadError) {
+                console.error('[Chat] Error loading books:', loadError);
               }
             }
             
-            if (allBooks.length > 0) {
-              // Chuyển bookIds sang số nguyên để so sánh đúng
-              const bookIdsAsNumbers = suggestedBookIds.map(id => typeof id === 'string' ? parseInt(id, 10) : id);
-              console.log(`[Chat] Looking for ${bookIdsAsNumbers.length} books (IDs: ${bookIdsAsNumbers.join(', ')}) in ${allBooks.length} total books`);
-              console.log(`[Chat] Available book IDs (first 10): ${allBooks.slice(0, 10).map(b => b.id).join(', ')}`);
+            // Validate IDs từ GPT - chỉ lấy IDs thực tế có trong DB
+            const availableIds = allBooks.map(b => b.id);
+            let validBookIds = [];
+            
+            if (suggestedBookIds.length > 0) {
+              validBookIds = suggestedBookIds.filter(id => availableIds.includes(id));
               
-              suggestedBooks = allBooks.filter(book => 
-                bookIdsAsNumbers.includes(book.id)
-              );
-              console.log(`[Chat] Found ${suggestedBooks.length} books (IDs: ${suggestedBooks.map(b => b.id).join(', ')})`);
-              
-              if (suggestedBooks.length < bookIdsAsNumbers.length) {
-                const foundIds = suggestedBooks.map(b => b.id);
-                const missingIds = bookIdsAsNumbers.filter(id => !foundIds.includes(id));
-                console.log(`[Chat] Warning: Some book IDs from GPT not found in database: ${missingIds.join(', ')}`);
+              if (validBookIds.length !== suggestedBookIds.length) {
+                const invalidIds = suggestedBookIds.filter(id => !availableIds.includes(id));
+                console.log(`[Chat] Warning: GPT suggested invalid IDs: [${invalidIds.join(', ')}]. Valid IDs in DB: [${availableIds.join(', ')}]`);
               }
               
-              // KHÔNG có fallback - nếu không tìm thấy thì để suggestedBooks = []
+              // Tìm sách từ validBookIds
+              suggestedBooks = allBooks.filter(book => 
+                validBookIds.includes(book.id)
+              );
+              console.log(`[Chat] Found ${suggestedBooks.length} books from GPT suggestions (valid IDs: [${validBookIds.join(', ')}])`);
             }
-          } else {
-            console.log(`[Chat] No book IDs suggested by GPT - no books will be suggested`);
-            // KHÔNG đề xuất sách phổ biến nếu GPT không đề xuất
+            
+            // Nếu GPT không đề xuất bookIds HOẶC đề xuất IDs không tồn tại, thử keyword search
+            if (suggestedBooks.length === 0 && allBooks.length > 0) {
+              console.log(`[Chat] No books from GPT suggestions (suggestedBookIds: [${suggestedBookIds.join(', ')}], valid: [${validBookIds.join(', ')}]), trying keyword search...`);
+              try {
+                const keywordBooks = await bookService.searchBooks(userMessage, 5);
+                if (keywordBooks && keywordBooks.length > 0) {
+                  suggestedBooks = keywordBooks;
+                  console.log(`[Chat] Keyword search found ${suggestedBooks.length} books (IDs: ${suggestedBooks.map(b => b.id).join(', ')})`);
+                } else {
+                  console.log(`[Chat] Keyword search returned no results for query: "${userMessage}"`);
+                }
+              } catch (searchError) {
+                console.error('[Chat] Error in keyword search:', searchError);
+              }
+            }
+            
+            // Nếu vẫn không có sách, cập nhật message để thông báo không có
+            if (suggestedBooks.length === 0) {
+              message = 'Xin lỗi, hiện tại chúng tôi không có sách phù hợp với yêu cầu của bạn. Vui lòng thử lại với từ khóa khác hoặc liên hệ hỗ trợ để được tư vấn.';
+              console.log(`[Chat] No books found, updated message to inform user`);
+            }
           }
           
           // Lấy thông tin voucher từ voucherCodes

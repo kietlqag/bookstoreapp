@@ -88,6 +88,18 @@ class OrderService {
     }
   }
 
+  Future<OrderSummary> fetchOrder({
+    required int orderId,
+    required int userId,
+  }) async {
+    final orders = await fetchOrders(userId);
+    final order = orders.firstWhere(
+      (o) => o.id == orderId,
+      orElse: () => throw OrderServiceException('Order not found.'),
+    );
+    return order;
+  }
+
   Future<void> updateOrderAddress({
     required int orderId,
     required int userId,

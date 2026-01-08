@@ -32,8 +32,18 @@ async function register({ fullName, email, password }) {
     expiresAt,
   });
 
-  await sendOtpEmail({ to: email, code });
-  console.log(`OTP email sent to ${email}`);
+  try {
+    await sendOtpEmail({ to: email, code });
+    console.log(`OTP email sent to ${email}`);
+  } catch (emailError) {
+    console.error(`Failed to send OTP email to ${email}:`, emailError);
+    if (emailError.message && emailError.message.includes('App Password')) {
+      throw emailError; // Re-throw the improved error message
+    }
+    const error = new Error('Không thể gửi email. Vui lòng kiểm tra cấu hình email server hoặc thử lại sau.');
+    error.status = 500;
+    throw error;
+  }
 
   return { ok: true };
 }
@@ -56,7 +66,19 @@ async function resendOtp({ email }) {
   const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
 
   await otpRepository.updateOtp(record.id, { code, expiresAt });
-  await sendOtpEmail({ to: email, code });
+  
+  try {
+    await sendOtpEmail({ to: email, code });
+    console.log(`Resend OTP email sent to ${email}`);
+  } catch (emailError) {
+    console.error(`Failed to send resend OTP email to ${email}:`, emailError);
+    if (emailError.message && emailError.message.includes('App Password')) {
+      throw emailError; // Re-throw the improved error message
+    }
+    const error = new Error('Không thể gửi email. Vui lòng kiểm tra cấu hình email server hoặc thử lại sau.');
+    error.status = 500;
+    throw error;
+  }
 
   return { ok: true };
 }
@@ -185,6 +207,147 @@ function getSocialLookup(provider, providerUserId) {
   throw error;
 }
 
+async function forgotPassword({ email }) {
+  // Check if user exists
+  const user = await userRepository.findByEmail(email);
+  if (!user) {
+    const error = new Error('Email không tồn tại trong hệ thống.');
+    error.status = 404;
+    throw error;
+  }
+
+  // Check if user has password (not social login only)
+  if (!user.passwordHash) {
+    const error = new Error('Tài khoản này sử dụng đăng nhập bằng tài khoản xã hội. Không thể đặt lại mật khẩu.');
+    error.status = 400;
+    throw error;
+  }
+
+  // Delete any existing OTP for this email
+  await otpRepository.deleteByEmail(email);
+
+  // Generate new OTP
+  const code = generateOtpCode();
+  const expiresAt = new Date(Date.now() + OTP_EXPIRY_MINUTES * 60 * 1000);
+
+  // Create OTP record for reset password (without passwordHash)
+  await otpRepository.createResetPasswordOtp({
+    email,
+    code,
+    expiresAt,
+  });
+
+  // Send OTP email
+  try {
+    await sendOtpEmail({ to: email, code });
+    console.log(`Reset password OTP email sent to ${email}`);
+  } catch (emailError) {
+    // If email sending fails, still return success to user (security best practice)
+    // But log the error for admin
+    console.error(`Failed to send reset password email to ${email}:`, emailError);
+    // Re-throw with user-friendly message
+    if (emailError.message && emailError.message.includes('App Password')) {
+      throw emailError; // Re-throw the improved error message
+    }
+    const error = new Error('Không thể gửi email. Vui lòng kiểm tra cấu hình email server hoặc thử lại sau.');
+    error.status = 500;
+    throw error;
+  }
+
+  return { ok: true };
+}
+
+async function verifyResetOtp({ email, code }) {
+  const record = await otpRepository.findLatestByEmail(email);
+  if (!record) {
+    const error = new Error('OTP not found. Please request a new one.');
+    error.status = 404;
+    throw error;
+  }
+
+  if (record.verifiedAt) {
+    const error = new Error('OTP already used. Please request a new one.');
+    error.status = 400;
+    throw error;
+  }
+
+  if (new Date(record.expiresAt).getTime() < Date.now()) {
+    const error = new Error('OTP expired. Please request a new one.');
+    error.status = 400;
+    throw error;
+  }
+
+  if (record.code !== code) {
+    await otpRepository.incrementAttempts(record.id);
+    if (record.attempts + 1 >= OTP_MAX_ATTEMPTS) {
+      await otpRepository.deleteByEmail(email);
+      const error = new Error('Too many failed attempts. Please request a new OTP.');
+      error.status = 429;
+      throw error;
+    }
+    const error = new Error('Invalid OTP code.');
+    error.status = 400;
+    throw error;
+  }
+
+  // Mark OTP as verified
+  await otpRepository.markVerified(record.id);
+
+  return { ok: true };
+}
+
+async function resetPassword({ email, code, newPassword }) {
+  // Verify OTP first
+  const record = await otpRepository.findLatestByEmail(email);
+  if (!record) {
+    const error = new Error('OTP not found. Please request a new one.');
+    error.status = 404;
+    throw error;
+  }
+
+  if (record.verifiedAt) {
+    const error = new Error('OTP already used. Please request a new one.');
+    error.status = 400;
+    throw error;
+  }
+
+  if (new Date(record.expiresAt).getTime() < Date.now()) {
+    const error = new Error('OTP expired. Please request a new one.');
+    error.status = 400;
+    throw error;
+  }
+
+  if (record.code !== code) {
+    await otpRepository.incrementAttempts(record.id);
+    if (record.attempts + 1 >= OTP_MAX_ATTEMPTS) {
+      await otpRepository.deleteByEmail(email);
+      const error = new Error('Too many failed attempts. Please request a new OTP.');
+      error.status = 429;
+      throw error;
+    }
+    const error = new Error('Invalid OTP code.');
+    error.status = 400;
+    throw error;
+  }
+
+  // Mark OTP as verified
+  await otpRepository.markVerified(record.id);
+
+  // Update password
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  const updated = await userRepository.updatePasswordByEmail({ email, passwordHash });
+  if (!updated) {
+    const error = new Error('User not found.');
+    error.status = 404;
+    throw error;
+  }
+
+  // Delete OTP record after successful password reset
+  await otpRepository.deleteByEmail(email);
+
+  return { ok: true };
+}
+
 module.exports = {
   register,
   resendOtp,
@@ -192,4 +355,7 @@ module.exports = {
   login,
   socialRegister,
   socialLogin,
+  forgotPassword,
+  verifyResetOtp,
+  resetPassword,
 };

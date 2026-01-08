@@ -49,6 +49,26 @@ async function getRequestDetail(requestId, userId) {
   };
 }
 
+function getUsersWithMessages() {
+  return supportRepository.findUsersWithMessages();
+}
+
+function getNewMessages({ afterTimestamp = null, afterId = null } = {}) {
+  return supportRepository.findNewMessagesAfter(afterTimestamp, afterId);
+}
+
+function getMessagesForStaff(userId) {
+  return supportRepository.findMessagesByUserIdForStaff(userId);
+}
+
+function markMessagesAsRead(userId, messageIds = null) {
+  return supportRepository.markMessagesAsRead(userId, messageIds);
+}
+
+function getUnreadMessageCount(userId) {
+  return supportRepository.getUnreadMessageCount(userId);
+}
+
 module.exports = {
   createSupportRequest,
   createSupportMessage,
@@ -56,4 +76,9 @@ module.exports = {
   listMessages,
   listRequests,
   getRequestDetail,
+  getUsersWithMessages,
+  getNewMessages,
+  getMessagesForStaff,
+  markMessagesAsRead,
+  getUnreadMessageCount,
 };

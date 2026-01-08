@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../models/support_service.dart';
+import '../utils/date_formatter.dart';
 import '../widgets/app_colors.dart';
 import 'support_request_detail_page.dart';
 
@@ -178,27 +179,6 @@ class _RequestCard extends StatelessWidget {
   final SupportRequest request;
   final VoidCallback onTap;
 
-  String _formatDate(DateTime date) {
-    final localDate = date.toLocal();
-    final now = DateTime.now();
-    final difference = now.difference(localDate);
-
-    if (difference.inDays == 0) {
-      if (difference.inHours == 0) {
-        if (difference.inMinutes == 0) {
-          return 'Vừa xong';
-        }
-        return '${difference.inMinutes} phút trước';
-      }
-      return '${difference.inHours} giờ trước';
-    } else if (difference.inDays == 1) {
-      return 'Hôm qua';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} ngày trước';
-    } else {
-      return '${localDate.day}/${localDate.month}/${localDate.year}';
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -318,7 +298,7 @@ class _RequestCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 4),
                 Text(
-                  _formatDate(request.createdAt),
+                  DateFormatter.formatRelativeTime(request.createdAt),
                   style: Theme.of(context).textTheme.labelSmall?.copyWith(
                         color: AppColors.gray500,
                       ),

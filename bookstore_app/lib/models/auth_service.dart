@@ -43,6 +43,34 @@ class AuthService {
     });
   }
 
+  Future<void> forgotPassword({required String email}) {
+    return _postOk('/api/auth/forgot-password', {
+      'email': email,
+    });
+  }
+
+  Future<void> verifyResetOtp({
+    required String email,
+    required String code,
+  }) {
+    return _postOk('/api/auth/verify-reset-otp', {
+      'email': email,
+      'code': code,
+    });
+  }
+
+  Future<void> resetPassword({
+    required String email,
+    required String code,
+    required String newPassword,
+  }) {
+    return _postOk('/api/auth/reset-password', {
+      'email': email,
+      'code': code,
+      'newPassword': newPassword,
+    });
+  }
+
   Future<AuthSession> socialRegister({
     required String provider,
     required String providerUserId,

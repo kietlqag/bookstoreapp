@@ -174,7 +174,7 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
       setState(() {
         _loadingExisting = false;
       });
-      _showMessage(error.toString());
+      _showMessage('Đã xảy ra lỗi. Vui lòng thử lại sau.');
     }
   }
 
@@ -262,11 +262,6 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
         videos: draft.newVideos.map((file) => file.path).toList(),
       );
 
-      if (remaining == 0) {
-        if (mounted) Navigator.of(context).pop(true);
-        return;
-      }
-
       setState(() {
         _pendingItems.removeAt(_safeIndex);
         _drafts.remove(selectedItem.id);
@@ -276,13 +271,17 @@ class _ReviewOrderPageState extends State<ReviewOrderPage> {
         }
         _loadDraftForSelectedItem();
       });
+
+      if (remaining == 0) {
+        if (mounted) Navigator.of(context).pop(true);
+        return;
+      }
+
       _showMessage(
-        'Da gui danh gia. Con ' +
-            remaining.toString() +
-            ' s\u1ea3n ph\u1ea9m ch\u01b0a \u0111\u00e1nh gi\u00e1.',
+        'Đã gửi đánh giá. Còn ${remaining.toString()} sản phẩm chưa đánh giá.',
       );
     } catch (error) {
-      _showMessage(error.toString());
+      _showMessage('Đã xảy ra lỗi. Vui lòng thử lại sau.');
     } finally {
       setState(() => _isSubmitting = false);
     }

@@ -80,7 +80,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
         shippingCount: _profile.shippingCount,
         deliveredCount: _profile.deliveredCount,
         reviewPendingCount: _profile.reviewPendingCount,
-        returningCount: _profile.returningCount,
         cancelledCount: _profile.cancelledCount,
         bookCount: _profile.bookCount,
         favoriteCount: _profile.favoriteCount,
@@ -331,7 +330,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                 shippingCount: _profile.shippingCount,
                                 deliveredCount: _profile.deliveredCount,
                                 reviewPendingCount: _profile.reviewPendingCount,
-                                returningCount: _profile.returningCount,
                                 cancelledCount: _profile.cancelledCount,
                                 bookCount: _profile.bookCount,
                                 favoriteCount: _profile.favoriteCount,
@@ -367,7 +365,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                 shippingCount: _profile.shippingCount,
                                 deliveredCount: _profile.deliveredCount,
                                 reviewPendingCount: _profile.reviewPendingCount,
-                                returningCount: _profile.returningCount,
                                 cancelledCount: _profile.cancelledCount,
                                 bookCount: _profile.bookCount,
                                 favoriteCount: _profile.favoriteCount,
@@ -533,7 +530,7 @@ class _ContactRequestPageState extends State<_ContactRequestPage> {
       if (!mounted) return;
       showTopMessage(
         context,
-        message: error.toString(),
+        message: 'Đã xảy ra lỗi. Vui lòng thử lại sau.',
         type: TopMessageType.error,
       );
     } finally {
@@ -644,7 +641,7 @@ class _ContactVerifyPageState extends State<_ContactVerifyPage> {
       if (!mounted) return;
       showTopMessage(
         context,
-        message: error.toString(),
+        message: 'Đã xảy ra lỗi. Vui lòng thử lại sau.',
         type: TopMessageType.error,
       );
     } finally {

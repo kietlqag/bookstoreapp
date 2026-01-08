@@ -42,6 +42,7 @@ class HomePage extends StatefulWidget {
     required this.onLogout,
     required this.userId,
     required this.token,
+    this.onReloadBooks,
   });
 
   static final ValueNotifier<String> tabNotifier =
@@ -52,6 +53,7 @@ class HomePage extends StatefulWidget {
   }
 
   final List<Book> books;
+  final VoidCallback? onReloadBooks;
   final List<CartItem> cartItems;
   final Set<int> favoriteIds;
   final CategoryService categoryService;
@@ -72,14 +74,35 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   String _activeTab = 'home';
   late final VoidCallback _tabListener;
+  final ValueNotifier<bool> _profileReloadNotifier = ValueNotifier<bool>(false);
+  String? _previousTab;
 
   void _handleTabChange(String tab) {
     if (HomePage.tabNotifier.value != tab) {
       HomePage.tabNotifier.value = tab;
     }
     setState(() {
+      _previousTab = _activeTab;
       _activeTab = tab;
     });
+    // Reload profile page when switching to profile tab
+    if (tab == 'profile') {
+      _profileReloadNotifier.value = !_profileReloadNotifier.value;
+    }
+    // Reload books when switching to home tab to update rating and soldQuantity
+    if (tab == 'home') {
+      widget.onReloadBooks?.call();
+    }
+  }
+  
+  void _handleOrderCompleted(List<int> cartItemIds) {
+    widget.onOrderCompleted(cartItemIds);
+    // Reload profile page if it's the current tab to update stats
+    if (_activeTab == 'profile') {
+      _profileReloadNotifier.value = !_profileReloadNotifier.value;
+    }
+    // Always reload books after order to update soldQuantity
+    widget.onReloadBooks?.call();
   }
 
   @override
@@ -90,8 +113,17 @@ class _HomePageState extends State<HomePage> {
       final next = HomePage.tabNotifier.value;
       if (!mounted || next == _activeTab) return;
       setState(() {
+        _previousTab = _activeTab;
         _activeTab = next;
       });
+      // Reload profile page when switching to profile tab
+      if (next == 'profile') {
+        _profileReloadNotifier.value = !_profileReloadNotifier.value;
+      }
+      // Reload books when switching to home tab
+      if (next == 'home') {
+        widget.onReloadBooks?.call();
+      }
     };
     HomePage.tabNotifier.addListener(_tabListener);
   }
@@ -125,6 +157,7 @@ class _HomePageState extends State<HomePage> {
         onToggleFavorite: widget.onToggleFavorite,
         baseUrl: _resolveBaseUrl(),
         token: widget.token,
+        userId: widget.userId,
       ),
       'search': SearchPage(
         books: widget.books,
@@ -133,6 +166,7 @@ class _HomePageState extends State<HomePage> {
         onToggleFavorite: widget.onToggleFavorite,
         baseUrl: _resolveBaseUrl(),
         token: widget.token,
+        userId: widget.userId,
       ),
       'cart': CartPage(
         cartItems: widget.cartItems,
@@ -140,14 +174,15 @@ class _HomePageState extends State<HomePage> {
         onDecrease: widget.onDecreaseCart,
         onRemove: widget.onRemoveCart,
         onOpenBook: widget.onOpenBook,
-        onOrderCompleted: widget.onOrderCompleted,
+        onOrderCompleted: _handleOrderCompleted,
         userId: widget.userId,
       ),
-      'contact': ContactPage(userId: widget.userId),
+      'contact': ContactPage(userId: widget.userId, token: widget.token),
       'profile': ProfilePage(
         onLogout: widget.onLogout,
         userId: widget.userId,
         token: widget.token,
+        reloadNotifier: _profileReloadNotifier,
       ),
     };
 
@@ -187,6 +222,7 @@ class _HomeTab extends StatefulWidget {
     required this.onToggleFavorite,
     required this.baseUrl,
     required this.token,
+    required this.userId,
   });
 
   final List<Book> books;
@@ -197,6 +233,7 @@ class _HomeTab extends StatefulWidget {
   final Future<bool> Function(Book book) onToggleFavorite;
   final String baseUrl;
   final String token;
+  final int userId;
 
   @override
   State<_HomeTab> createState() => _HomeTabState();
@@ -216,6 +253,49 @@ class _HomeTabState extends State<_HomeTab> {
   late final NotificationService _notificationService =
       NotificationService(baseUrl: widget.baseUrl, token: widget.token);
   int _unreadNotificationCount = 0;
+  List<Book> _currentBooks = [];
+
+  @override
+  void didUpdateWidget(_HomeTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Always update books when widget.books reference changes
+    // This ensures UI updates when books are reloaded from DB
+    if (oldWidget.books != widget.books) {
+      setState(() {
+        _currentBooks = List<Book>.from(widget.books);
+      });
+      return;
+    }
+    
+    // Even if reference is same, check if any book properties changed
+    // This handles cases where books list is recreated but properties updated
+    if (oldWidget.books.length != widget.books.length) {
+      setState(() {
+        _currentBooks = List<Book>.from(widget.books);
+      });
+      return;
+    }
+    
+    // Deep check for property changes (rating, soldQuantity, reviewCount)
+    bool hasChanges = false;
+    for (int i = 0; i < widget.books.length && i < oldWidget.books.length; i++) {
+      final oldBook = oldWidget.books[i];
+      final newBook = widget.books[i];
+      if (oldBook.id != newBook.id ||
+          oldBook.rating != newBook.rating ||
+          oldBook.soldQuantity != newBook.soldQuantity ||
+          oldBook.reviewCount != newBook.reviewCount) {
+        hasChanges = true;
+        break;
+      }
+    }
+    if (hasChanges) {
+      setState(() {
+        _currentBooks = List<Book>.from(widget.books);
+      });
+    }
+  }
+  
 
   Future<void> _handleFavorite(Book book) async {
     try {
@@ -225,14 +305,14 @@ class _HomeTabState extends State<_HomeTab> {
     } catch (error) {
       showTopMessage(
         context,
-        message: error.toString(),
+        message: 'Đã xảy ra lỗi. Vui lòng thử lại sau.',
         type: TopMessageType.error,
       );
     }
   }
 
   void _openFeaturedPage() {
-    final featuredByRating = [...widget.books]
+    final featuredByRating = [..._currentBooks]
       ..sort((a, b) => b.rating.compareTo(a.rating));
     final topFeaturedBooks = featuredByRating.take(30).toList();
     Navigator.of(context).push(
@@ -250,12 +330,13 @@ class _HomeTabState extends State<_HomeTab> {
   @override
   void initState() {
     super.initState();
+    _currentBooks = widget.books;
     _loadCategories();
     _loadUnreadNotificationCount();
     _flashEndsAt = DateTime.now().add(const Duration(hours: 5, minutes: 30));
     _timeLeft = _flashEndsAt.difference(DateTime.now());
     _flashTimer = Timer.periodic(const Duration(seconds: 4), (_) {
-      final count = widget.books.length < 4 ? widget.books.length : 4;
+      final count = _currentBooks.length < 4 ? _currentBooks.length : 4;
       if (count <= 1 || !_flashController.hasClients) return;
       final next = (_flashIndex + 1) % count;
       _flashController.animateToPage(
@@ -316,13 +397,13 @@ class _HomeTabState extends State<_HomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    final featuredByRating = [...widget.books]
+    final featuredByRating = [..._currentBooks]
       ..sort((a, b) => b.rating.compareTo(a.rating));
     final featuredBooks = featuredByRating.take(5).toList();
-    final bestSellerBooks = [...widget.books]
+    final bestSellerBooks = [..._currentBooks]
       ..sort((a, b) => b.soldQuantity.compareTo(a.soldQuantity));
     final bestSellerTop5 = bestSellerBooks.take(5).toList();
-    final flashBooks = widget.books.take(4).toList();
+    final flashBooks = _currentBooks.take(4).toList();
 
     return Column(
       children: [
@@ -369,6 +450,7 @@ class _HomeTabState extends State<_HomeTab> {
                 builder: (_) => NotificationListPage(
                   baseUrl: widget.baseUrl,
                   token: widget.token,
+                  userId: widget.userId,
                 ),
               ),
             );

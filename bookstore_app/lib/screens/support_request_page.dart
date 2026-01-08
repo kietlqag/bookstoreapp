@@ -97,7 +97,7 @@ class _SupportRequestPageState extends State<SupportRequestPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Gửi yêu cầu thất bại: ${error.toString()}'),
+          content: Text('Gửi yêu cầu thất bại. Vui lòng thử lại sau.'),
           backgroundColor: Colors.red,
         ),
       );

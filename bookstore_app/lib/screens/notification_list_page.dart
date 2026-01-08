@@ -1,18 +1,24 @@
 import 'package:flutter/material.dart';
 
 import '../models/notification_service.dart';
+import '../models/order_service.dart';
+import '../models/order.dart';
+import '../utils/date_formatter.dart';
 import '../widgets/app_colors.dart';
 import 'notification_detail_page.dart';
+import 'order_detail_page.dart';
 
 class NotificationListPage extends StatefulWidget {
   const NotificationListPage({
     super.key,
     required this.baseUrl,
     required this.token,
+    required this.userId,
   });
 
   final String baseUrl;
   final String token;
+  final int userId;
 
   @override
   State<NotificationListPage> createState() => _NotificationListPageState();
@@ -21,8 +27,10 @@ class NotificationListPage extends StatefulWidget {
 class _NotificationListPageState extends State<NotificationListPage> {
   late final NotificationService _notificationService =
       NotificationService(baseUrl: widget.baseUrl, token: widget.token);
+  late final OrderService _orderService = OrderService(baseUrl: widget.baseUrl);
 
   List<NotificationItem> _notifications = [];
+  Map<int, OrderSummary?> _orderCache = {}; // Cache orders by orderId
   bool _loading = true;
   String? _error;
 
@@ -40,6 +48,30 @@ class _NotificationListPageState extends State<NotificationListPage> {
 
     try {
       final notifications = await _notificationService.getNotifications(includeRead: true);
+      if (!mounted) return;
+      
+      // Pre-load order data for order notifications
+      final orderNotifications = notifications
+          .where((n) => n.notificationType == NotificationType.order && n.relatedId != null)
+          .toList();
+      
+      for (final notification in orderNotifications) {
+        if (notification.relatedId != null) {
+          final orderId = int.tryParse(notification.relatedId!);
+          if (orderId != null && !_orderCache.containsKey(orderId)) {
+            try {
+              final order = await _orderService.fetchOrder(
+                orderId: orderId,
+                userId: widget.userId,
+              );
+              _orderCache[orderId] = order;
+            } catch (e) {
+              _orderCache[orderId] = null;
+            }
+          }
+        }
+      }
+      
       if (!mounted) return;
       setState(() {
         _notifications = notifications;
@@ -75,7 +107,7 @@ class _NotificationListPageState extends State<NotificationListPage> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Lỗi: ${error.toString()}'),
+          content: Text('Đã xảy ra lỗi: ${error.toString()}'),
           duration: const Duration(seconds: 2),
           behavior: SnackBarBehavior.floating,
         ),
@@ -248,12 +280,14 @@ class _NotificationListPageState extends State<NotificationListPage> {
 
     return InkWell(
       onTap: () {
+        // Always navigate to notification detail page first
         Navigator.of(context).push(
           MaterialPageRoute(
             builder: (context) => NotificationDetailPage(
               notification: notification,
               baseUrl: widget.baseUrl,
               token: widget.token,
+              userId: widget.userId,
               onMarkAsRead: () async {
                 await _loadNotifications(); // Reload để cập nhật UI
               },
@@ -341,7 +375,7 @@ class _NotificationListPageState extends State<NotificationListPage> {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _formatTime(notification.createdAt),
+                  DateFormatter.formatRelativeTime(notification.createdAt),
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppColors.gray500,
                         fontSize: 11,
@@ -356,21 +390,127 @@ class _NotificationListPageState extends State<NotificationListPage> {
     );
   }
 
-  String _formatTime(DateTime time) {
-    final now = DateTime.now();
-    final difference = now.difference(time);
-
-    if (difference.inMinutes < 1) {
-      return 'Vừa xong';
-    } else if (difference.inMinutes < 60) {
-      return '${difference.inMinutes} phút trước';
-    } else if (difference.inHours < 24) {
-      return '${difference.inHours} giờ trước';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} ngày trước';
-    } else {
-      return '${time.day}/${time.month}/${time.year}';
+  Future<OrderSummary?> _loadOrderForNotification(String orderIdStr) async {
+    final orderId = int.tryParse(orderIdStr);
+    if (orderId == null) return null;
+    
+    // Check cache first
+    if (_orderCache.containsKey(orderId)) {
+      return _orderCache[orderId];
+    }
+    
+    try {
+      final order = await _orderService.fetchOrder(
+        orderId: orderId,
+        userId: widget.userId,
+      );
+      _orderCache[orderId] = order;
+      return order;
+    } catch (e) {
+      _orderCache[orderId] = null;
+      return null;
     }
   }
+
+  Widget _buildOrderCard(OrderSummary order) {
+    if (order.items.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    // Show first 3 items
+    final displayItems = order.items.take(3).toList();
+    final remainingCount = order.items.length - displayItems.length;
+    
+    return Container(
+      margin: const EdgeInsets.only(top: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.gray50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.gray200, width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.receipt_long_outlined,
+                size: 16,
+                color: AppColors.orange600,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Đơn hàng #${order.id}',
+                style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.orange600,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          ...displayItems.map((item) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: [
+                    // Product image
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: Image.network(
+                        item.bookImageUrl ?? '',
+                        width: 40,
+                        height: 40,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) => Container(
+                          width: 40,
+                          height: 40,
+                          color: AppColors.gray200,
+                          child: const Icon(Icons.book, size: 20),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    // Product info
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            item.bookTitle ?? 'Sản phẩm',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.gray900,
+                                ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Text(
+                            'Số lượng: ${item.quantity}',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppColors.gray600,
+                                  fontSize: 11,
+                                ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+          if (remainingCount > 0)
+            Text(
+              'và $remainingCount sản phẩm khác',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppColors.gray600,
+                    fontSize: 11,
+                    fontStyle: FontStyle.italic,
+                  ),
+            ),
+        ],
+      ),
+    );
+  }
+
 }
 

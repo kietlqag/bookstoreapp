@@ -21,6 +21,7 @@ class SearchPage extends StatefulWidget {
     required this.onToggleFavorite,
     required this.baseUrl,
     required this.token,
+    required this.userId,
   });
 
   final List<Book> books;
@@ -29,6 +30,7 @@ class SearchPage extends StatefulWidget {
   final Future<bool> Function(Book book) onToggleFavorite;
   final String baseUrl;
   final String token;
+  final int userId;
 
   @override
   State<SearchPage> createState() => _SearchPageState();
@@ -49,6 +51,18 @@ class _SearchPageState extends State<SearchPage> {
     super.initState();
     _loadRecentSearches();
     _loadUnreadNotificationCount();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reload notification count when page becomes visible again
+    // This ensures count is updated when switching tabs
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadUnreadNotificationCount();
+      }
+    });
   }
 
   Future<void> _loadUnreadNotificationCount() async {
@@ -131,7 +145,7 @@ class _SearchPageState extends State<SearchPage> {
     } catch (error) {
       showTopMessage(
         context,
-        message: error.toString(),
+        message: 'Đã xảy ra lỗi. Vui lòng thử lại sau.',
         type: TopMessageType.error,
       );
     }
@@ -203,6 +217,7 @@ class _SearchPageState extends State<SearchPage> {
                     builder: (_) => NotificationListPage(
                       baseUrl: widget.baseUrl,
                       token: widget.token,
+                      userId: widget.userId,
                     ),
                   ),
                 );

@@ -56,7 +56,7 @@ class _LoginPageState extends State<LoginPage> {
     } catch (error) {
       showTopMessage(
         context,
-        message: error.toString(),
+        message: 'Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin.',
         type: TopMessageType.error,
       );
     } finally {
@@ -74,7 +74,7 @@ class _LoginPageState extends State<LoginPage> {
     } catch (error) {
       showTopMessage(
         context,
-        message: error.toString(),
+        message: 'Đăng nhập thất bại. Vui lòng thử lại sau.',
         type: TopMessageType.error,
       );
     }

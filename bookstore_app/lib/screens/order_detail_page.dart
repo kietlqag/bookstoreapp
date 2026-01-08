@@ -8,6 +8,7 @@ import '../models/cart_service.dart';
 import '../models/order.dart';
 import '../models/order_service.dart';
 import '../models/review_service.dart';
+import '../utils/date_formatter.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/price_formatter.dart';
 import '../widgets/top_message.dart';
@@ -21,10 +22,12 @@ class OrderDetailPage extends StatefulWidget {
     super.key,
     required this.order,
     required this.userId,
+    this.onOrderUpdated,
   });
 
   final OrderSummary order;
   final int userId;
+  final VoidCallback? onOrderUpdated;
 
   @override
   State<OrderDetailPage> createState() => _OrderDetailPageState();
@@ -50,16 +53,43 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
       ReviewService(baseUrl: _resolveBaseUrl());
   late final CartService _cartService =
       CartService(baseUrl: _resolveBaseUrl());
+  OrderSummary? _currentOrder;
 
   @override
   void initState() {
     super.initState();
+    _currentOrder = widget.order;
     _addressNew = widget.order.shippingAddressNew;
     _addressOld = widget.order.shippingAddressOld;
     _recipientName = widget.order.recipientName;
     _phoneNumber = widget.order.phoneNumber;
     _currentStatus = widget.order.status;
     _reviewed = widget.order.isReviewed;
+  }
+
+  Future<bool> _reloadOrder() async {
+    try {
+      final updatedOrder = await _orderService.fetchOrder(
+        orderId: widget.order.id,
+        userId: widget.userId,
+      );
+      if (!mounted) return false;
+      final statusChanged = _currentStatus != updatedOrder.status;
+      setState(() {
+        _currentOrder = updatedOrder;
+        _addressNew = updatedOrder.shippingAddressNew;
+        _addressOld = updatedOrder.shippingAddressOld;
+        _recipientName = updatedOrder.recipientName;
+        _phoneNumber = updatedOrder.phoneNumber;
+        _currentStatus = updatedOrder.status;
+        _reviewed = updatedOrder.isReviewed;
+      });
+      widget.onOrderUpdated?.call();
+      return statusChanged;
+    } catch (_) {
+      // Ignore reload errors, keep current state
+      return false;
+    }
   }
 
   static String _resolveBaseUrl() {
@@ -107,13 +137,11 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         phoneNumber: selected.phoneNumber,
       );
       if (!mounted) return;
+      await _reloadOrder();
       setState(() {
-        _addressNew = newAddress;
-        _addressOld = oldAddress;
-        _recipientName = selected.fullName;
-        _phoneNumber = selected.phoneNumber;
         _addressUpdated = true;
       });
+      widget.onOrderUpdated?.call();
     } catch (_) {
       if (!mounted) return;
       _showMessage('Không cập nhật được địa chỉ.');
@@ -156,13 +184,14 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         userId: widget.userId,
       );
       if (!mounted) return;
-      setState(() {
-        _currentStatus = 'cancelled';
-      });
+      final updated = await _reloadOrder();
       _showMessage('Đã hủy đơn hàng.');
+      if (updated && mounted) {
+        Navigator.of(context).pop(true);
+      }
     } catch (error) {
       if (!mounted) return;
-      _showMessage(error.toString());
+      _showMessage('Đã xảy ra lỗi. Vui lòng thử lại sau.');
     } finally {
       if (mounted) {
         setState(() => _cancelling = false);
@@ -179,13 +208,14 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         userId: widget.userId,
       );
       if (!mounted) return;
-      setState(() {
-        _currentStatus = 'delivered';
-      });
+      final updated = await _reloadOrder();
       _showMessage('Đã xác nhận nhận hàng.');
+      if (updated && mounted) {
+        Navigator.of(context).pop(true);
+      }
     } catch (error) {
       if (!mounted) return;
-      _showMessage(error.toString());
+      _showMessage('Đã xảy ra lỗi. Vui lòng thử lại sau.');
     } finally {
       if (mounted) {
         setState(() => _markingReceived = false);
@@ -197,17 +227,16 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     final submitted = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => ReviewOrderPage(
-          order: widget.order,
+          order: _currentOrder ?? widget.order,
           userId: widget.userId,
           reviewService: _reviewService,
         ),
       ),
     );
-    if (!mounted || submitted != true) return;
-    setState(() {
-      _reviewed = true;
-    });
-    _showMessage('Cảm ơn bạn đã đánh giá.');
+      if (!mounted || submitted != true) return;
+      await _reloadOrder();
+      _showMessage('Cảm ơn bạn đã đánh giá.');
+      widget.onOrderUpdated?.call();
   }
 
   Future<void> _openSupportRequest() async {
@@ -215,8 +244,8 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
       MaterialPageRoute(
         builder: (_) => SupportRequestPage(
           userId: widget.userId,
-          orderId: widget.order.id,
-          orderCode: 'Đơn hàng #${widget.order.id}',
+          orderId: (_currentOrder ?? widget.order).id,
+          orderCode: 'Đơn hàng #${(_currentOrder ?? widget.order).id}',
         ),
       ),
     );
@@ -224,11 +253,11 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
 
   @override
   Widget build(BuildContext context) {
-    final order = widget.order;
+    final order = _currentOrder ?? widget.order;
     final status = _currentStatus;
     final statusText = _mapStatus(status);
     final dateText = order.orderDate != null
-        ? '${order.orderDate!.day}/${order.orderDate!.month}/${order.orderDate!.year}'
+        ? DateFormatter.formatDate(order.orderDate!.toLocal())
         : '--/--/----';
     final addressNew = _addressNew.trim();
     final addressOld = _addressOld.trim();
@@ -474,7 +503,8 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   }
 
   List<Widget> _buildItems(BuildContext context) {
-    final items = widget.order.items;
+    final order = _currentOrder ?? widget.order;
+    final items = order.items;
     if (items.isEmpty) {
       return [
         Text(
@@ -675,7 +705,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
       );
     }
 
-    if (status == 'returning' || status == 'refunding' || status == 'cancelled') {
+    if (status == 'cancelled') {
       return Row(
         children: [
           Expanded(
@@ -723,7 +753,8 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   }
 
   Future<void> _handleBuyAgain() async {
-    if (widget.order.items.isEmpty) {
+    final order = _currentOrder ?? widget.order;
+    if (order.items.isEmpty) {
       _showMessage('Đơn hàng không có sản phẩm.');
       return;
     }
@@ -731,7 +762,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     try {
       int successCount = 0;
       // Thêm tất cả sản phẩm vào giỏ hàng
-      for (final item in widget.order.items) {
+      for (final item in order.items) {
         try {
           await _cartService.addToCart(
             userId: widget.userId,
@@ -753,9 +784,9 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
       }
 
       // Hiển thị thông báo trước khi pop
-      final message = successCount == widget.order.items.length
+      final message = successCount == order.items.length
           ? 'Đã thêm $successCount sản phẩm vào giỏ hàng'
-          : 'Đã thêm $successCount/${widget.order.items.length} sản phẩm vào giỏ hàng';
+          : 'Đã thêm $successCount/${order.items.length} sản phẩm vào giỏ hàng';
 
       // Hiển thị thông báo ngay lập tức
       if (mounted) {
@@ -788,12 +819,10 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         return 'Chờ giao hàng';
       case 'delivered':
         return 'Đã giao';
-      case 'returning':
-        return 'Trả hàng';
-      case 'refunding':
-        return 'Hoàn tiền';
       case 'cancelled':
         return 'Đã hủy';
+      case 'processing':
+        return 'Đang xử lý';
       default:
         return status;
     }

@@ -8,9 +8,14 @@ import 'support_request_page.dart';
 import 'support_request_list_page.dart';
 
 class ContactPage extends StatelessWidget {
-  const ContactPage({super.key, required this.userId});
+  const ContactPage({
+    super.key,
+    required this.userId,
+    required this.token,
+  });
 
   final int userId;
+  final String token;
 
   @override
   Widget build(BuildContext context) {
@@ -123,7 +128,10 @@ class ContactPage extends StatelessWidget {
                       onTap: () {
                         Navigator.of(context).push(
                           MaterialPageRoute(
-                            builder: (_) => OnlineSupportPage(userId: userId),
+                            builder: (_) => OnlineSupportPage(
+                              userId: userId,
+                              token: token,
+                            ),
                           ),
                         );
                       },

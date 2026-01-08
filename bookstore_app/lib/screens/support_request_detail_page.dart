@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../models/support_service.dart';
+import '../utils/date_formatter.dart';
 import '../widgets/app_colors.dart';
 
 class SupportRequestDetailPage extends StatefulWidget {
@@ -179,11 +180,6 @@ class _RequestInfoCard extends StatelessWidget {
     }
   }
 
-  String _formatDateTime(DateTime date) {
-    final localDate = date.toLocal();
-    return '${localDate.day}/${localDate.month}/${localDate.year} ${localDate.hour.toString().padLeft(2, '0')}:${localDate.minute.toString().padLeft(2, '0')}';
-  }
-
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -294,14 +290,14 @@ class _RequestInfoCard extends StatelessWidget {
           _InfoRow(
             icon: Icons.access_time,
             label: 'Ngày gửi',
-            value: _formatDateTime(request.createdAt),
+            value: DateFormatter.formatDateTime(request.createdAt),
           ),
           if (request.updatedAt != null) ...[
             const SizedBox(height: 8),
             _InfoRow(
               icon: Icons.update,
               label: 'Cập nhật lần cuối',
-              value: _formatDateTime(request.updatedAt!),
+              value: DateFormatter.formatDateTime(request.updatedAt!),
             ),
           ],
         ],
@@ -448,11 +444,6 @@ class _TimelineItem extends StatelessWidget {
   final _StatusItem status;
   final bool isLast;
 
-  String _formatDate(DateTime date) {
-    final localDate = date.toLocal();
-    return '${localDate.day}/${localDate.month}/${localDate.year} ${localDate.hour.toString().padLeft(2, '0')}:${localDate.minute.toString().padLeft(2, '0')}';
-  }
-
   @override
   Widget build(BuildContext context) {
     return Row(
@@ -514,7 +505,7 @@ class _TimelineItem extends StatelessWidget {
                 if (status.isActive && status.date != null) ...[
                   const SizedBox(height: 4),
                   Text(
-                    _formatDate(status.date!),
+                    DateFormatter.formatDateTime(status.date!),
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: AppColors.gray500,
                         ),
@@ -533,20 +524,6 @@ class _MessagesCard extends StatelessWidget {
   const _MessagesCard({required this.messages});
 
   final List<SupportMessage> messages;
-
-  String _formatDateTime(DateTime date) {
-    final localDate = date.toLocal();
-    final now = DateTime.now();
-    final difference = now.difference(localDate);
-
-    if (difference.inDays == 0) {
-      return '${localDate.hour.toString().padLeft(2, '0')}:${localDate.minute.toString().padLeft(2, '0')}';
-    } else if (difference.inDays == 1) {
-      return 'Hôm qua ${localDate.hour.toString().padLeft(2, '0')}:${localDate.minute.toString().padLeft(2, '0')}';
-    } else {
-      return '${localDate.day}/${localDate.month} ${localDate.hour.toString().padLeft(2, '0')}:${localDate.minute.toString().padLeft(2, '0')}';
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -580,7 +557,7 @@ class _MessagesCard extends StatelessWidget {
               child: _MessageBubble(
                 message: message.message,
                 isFromUser: message.isFromUser,
-                time: _formatDateTime(message.createdAt),
+                time: DateFormatter.formatChatTime(message.createdAt),
               ),
             );
           }).toList(),

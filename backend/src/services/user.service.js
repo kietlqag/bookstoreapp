@@ -29,7 +29,6 @@ async function getUserSummary(id) {
     shippingCount: Number(stats?.shippingCount || 0),
     deliveredCount: Number(stats?.deliveredCount || 0),
     reviewPendingCount: Number(stats?.reviewPendingCount || 0),
-    returningCount: Number(stats?.returningCount || 0),
     cancelledCount: Number(stats?.cancelledCount || 0),
     bookCount: Number(stats?.bookCount || 0),
     favoriteCount: Number(stats?.favoriteCount || 0),
