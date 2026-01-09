@@ -165,6 +165,76 @@ class ProfileService {
     }
   }
 
+  Future<bool> enableTwoFactor({
+    required int userId,
+    required String token,
+  }) async {
+    final client = HttpClient();
+    try {
+      final uri = Uri.parse('$baseUrl/api/users/$userId/two-factor/enable');
+      final request = await client.openUrl('POST', uri);
+      request.headers.contentType = ContentType.json;
+      request.headers.add('Authorization', 'Bearer $token');
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+      
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        String message = 'Request failed.';
+        try {
+          final parsed = jsonDecode(body);
+          if (parsed is Map && parsed['message'] != null) {
+            message = parsed['message'].toString();
+          }
+        } catch (_) {
+          // ignore parse failure
+        }
+        throw Exception(message);
+      }
+      if (body.isEmpty) return false;
+      final data = jsonDecode(body);
+      return (data as Map<String, dynamic>)['ok'] == true;
+    } on SocketException {
+      throw Exception('Cannot connect to server.');
+    } finally {
+      client.close(force: true);
+    }
+  }
+
+  Future<bool> disableTwoFactor({
+    required int userId,
+    required String token,
+  }) async {
+    final client = HttpClient();
+    try {
+      final uri = Uri.parse('$baseUrl/api/users/$userId/two-factor/disable');
+      final request = await client.openUrl('POST', uri);
+      request.headers.contentType = ContentType.json;
+      request.headers.add('Authorization', 'Bearer $token');
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+      
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        String message = 'Request failed.';
+        try {
+          final parsed = jsonDecode(body);
+          if (parsed is Map && parsed['message'] != null) {
+            message = parsed['message'].toString();
+          }
+        } catch (_) {
+          // ignore parse failure
+        }
+        throw Exception(message);
+      }
+      if (body.isEmpty) return false;
+      final data = jsonDecode(body);
+      return (data as Map<String, dynamic>)['ok'] == true;
+    } on SocketException {
+      throw Exception('Cannot connect to server.');
+    } finally {
+      client.close(force: true);
+    }
+  }
+
   Future<dynamic> _sendJson(
     String method,
     String path,

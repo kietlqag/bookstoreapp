@@ -2,11 +2,13 @@
 
 import '../../widgets/app_colors.dart';
 import '../../widgets/top_message.dart';
+import '../../models/auth_service.dart' show TwoFactorRequiredException;
 
 class LoginPage extends StatefulWidget {
   const LoginPage({
     super.key,
     required this.onLogin,
+    required this.onVerifyOtp,
     required this.onRegister,
     required this.onForgot,
     required this.onGoogleLogin,
@@ -14,6 +16,7 @@ class LoginPage extends StatefulWidget {
   });
 
   final Future<void> Function(String email, String password) onLogin;
+  final Future<void> Function(String email, String code) onVerifyOtp;
   final VoidCallback onRegister;
   final VoidCallback onForgot;
   final Future<void> Function() onGoogleLogin;
@@ -53,6 +56,14 @@ class _LoginPageState extends State<LoginPage> {
         _emailController.text.trim(),
         _passwordController.text.trim(),
       );
+    } on TwoFactorRequiredException catch (e) {
+      // Show 2FA OTP dialog
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+        _showTwoFactorDialog(e.email, e.message);
+      }
     } catch (error) {
       // Hiển thị message lỗi cụ thể từ backend
       final errorMessage = error.toString();
@@ -72,9 +83,109 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
+  void _showTwoFactorDialog(String email, String message) {
+    final otpController = TextEditingController();
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.security, color: AppColors.orange600),
+              SizedBox(width: 8),
+              Text('Xác thực 2 lớp'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(message),
+              const SizedBox(height: 16),
+              TextField(
+                controller: otpController,
+                keyboardType: TextInputType.number,
+                maxLength: 6,
+                decoration: const InputDecoration(
+                  labelText: 'Mã OTP',
+                  hintText: 'Nhập mã 6 số',
+                  counterText: '',
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading
+                  ? null
+                  : () {
+                      Navigator.pop(context);
+                      // Retry login
+                      _submit();
+                    },
+              child: const Text('Hủy'),
+            ),
+            ElevatedButton(
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      final code = otpController.text.trim();
+                      if (code.length != 6) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Vui lòng nhập mã OTP 6 số'),
+                            backgroundColor: Colors.red,
+                          ),
+                        );
+                        return;
+                      }
+
+                      setDialogState(() => isLoading = true);
+                      try {
+                        await widget.onVerifyOtp(email, code);
+                        if (context.mounted) {
+                          Navigator.pop(context);
+                        }
+                      } catch (error) {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(error.toString().replaceFirst('Exception: ', '')),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      } finally {
+                        if (context.mounted) {
+                          setDialogState(() => isLoading = false);
+                        }
+                      }
+                    },
+              child: isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Xác nhận'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _handleSocial(Future<void> Function() action) async {
     try {
       await action();
+    } on TwoFactorRequiredException catch (e) {
+      // Show 2FA OTP dialog for social login
+      if (mounted) {
+        _showTwoFactorDialog(e.email, e.message);
+      }
     } catch (error) {
       // Hiển thị message lỗi cụ thể từ backend
       final errorMessage = error.toString();

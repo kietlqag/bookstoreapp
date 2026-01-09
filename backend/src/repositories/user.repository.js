@@ -45,7 +45,7 @@ async function createUser({
 
 async function findPublicById(id) {
   const result = await pool.query(
-    'SELECT id, "fullName", email, "phoneNumber", address, avatar FROM "User" WHERE id = $1',
+    'SELECT id, "fullName", email, "phoneNumber", address, avatar, "twoFactorEnabled" FROM "User" WHERE id = $1',
     [id],
   );
   return result.rows[0] || null;
@@ -203,6 +203,14 @@ async function deleteUser(id) {
   }
 }
 
+async function updateTwoFactorEnabled(id, enabled) {
+  const result = await pool.query(
+    'UPDATE "User" SET "twoFactorEnabled" = $1 WHERE id = $2 RETURNING id, "twoFactorEnabled"',
+    [enabled, id],
+  );
+  return result.rows[0] || null;
+}
+
 module.exports = {
   findByEmail,
   findByPhone,
@@ -217,4 +225,5 @@ module.exports = {
   updatePasswordById,
   deactivateUser,
   deleteUser,
+  updateTwoFactorEnabled,
 };

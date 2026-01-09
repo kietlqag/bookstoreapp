@@ -14,5 +14,7 @@ router.post('/:id/phone/verify', userController.verifyPhoneChange);
 router.put('/:id/password', authenticateToken, userController.changePassword);
 router.post('/:id/delete/request', authenticateToken, userController.requestAccountDeletion);
 router.post('/:id/delete/verify', authenticateToken, userController.verifyAccountDeletion);
+router.post('/:id/two-factor/enable', authenticateToken, userController.enableTwoFactor);
+router.post('/:id/two-factor/disable', authenticateToken, userController.disableTwoFactor);
 
 module.exports = router;

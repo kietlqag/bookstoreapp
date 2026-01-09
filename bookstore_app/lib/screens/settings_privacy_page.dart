@@ -7,6 +7,7 @@ import 'dart:convert';
 import '../widgets/app_colors.dart';
 import '../models/profile_service.dart';
 import '../models/profile_summary.dart';
+import '../utils/config.dart';
 
 class SettingsPrivacyPage extends StatefulWidget {
   const SettingsPrivacyPage({
@@ -31,12 +32,7 @@ class _SettingsPrivacyPageState extends State<SettingsPrivacyPage> {
   late final ProfileService _profileService = ProfileService(baseUrl: _resolveBaseUrl());
 
   String _resolveBaseUrl() {
-    const overrideUrl = String.fromEnvironment('API_BASE_URL');
-    if (overrideUrl.isNotEmpty) return overrideUrl;
-    if (Platform.isAndroid) {
-      return 'http://192.168.1.155:8080';
-    }
-    return 'http://localhost:8080';
+    return AppConfig.getBaseUrlSync();
   }
 
   @override
@@ -74,6 +70,71 @@ class _SettingsPrivacyPageState extends State<SettingsPrivacyPage> {
   }
 
   bool get _hasEmail => _profile?.email != null && _profile!.email.trim().isNotEmpty;
+
+  Future<void> _toggleTwoFactor(bool enabled) async {
+    if (!_hasEmail) {
+      _showEmailRequiredDialog();
+      return;
+    }
+
+    setState(() => _loading = true);
+    try {
+      bool success;
+      if (enabled) {
+        success = await _profileService.enableTwoFactor(
+          userId: widget.userId,
+          token: widget.token,
+        );
+      } else {
+        success = await _profileService.disableTwoFactor(
+          userId: widget.userId,
+          token: widget.token,
+        );
+      }
+
+      if (!mounted) return;
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(enabled
+                ? 'Xác thực 2 lớp đã được bật'
+                : 'Xác thực 2 lớp đã được tắt'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        // Reload profile to update UI
+        await _loadProfile();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      String errorMessage = enabled
+          ? 'Không thể bật xác thực 2 lớp'
+          : 'Không thể tắt xác thực 2 lớp';
+      
+      // Check if error is about email required
+      final errorStr = e.toString();
+      if (errorStr.contains('email') || errorStr.contains('Email')) {
+        _showEmailRequiredDialog();
+        await _loadProfile();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorStr.contains('Exception:')
+                ? errorStr.replaceFirst('Exception: ', '')
+                : errorMessage),
+            backgroundColor: Colors.red,
+          ),
+        );
+        // Reload profile to revert UI state
+        await _loadProfile();
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -170,18 +231,22 @@ class _SettingsPrivacyPageState extends State<SettingsPrivacyPage> {
             icon: Icons.security_outlined,
             iconColor: Colors.green,
             title: 'Xác thực 2 lớp',
-            subtitle: 'Bảo vệ tài khoản an toàn hơn',
+            subtitle: _loadingProfile
+                ? 'Đang tải...'
+                : (!_hasEmail
+                    ? 'Vui lòng cập nhật email trước'
+                    : (_profile?.twoFactorEnabled == true
+                        ? 'Đã bật xác thực 2 lớp'
+                        : 'Bảo vệ tài khoản an toàn hơn')),
             trailing: Transform.scale(
               scale: 0.75,
               child: Switch(
-                value: false,
-                onChanged: (v) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Tính năng đang phát triển'),
-                    ),
-                  );
-                },
+                value: _profile?.twoFactorEnabled ?? false,
+                onChanged: _loadingProfile
+                    ? null
+                    : (!_hasEmail
+                        ? null
+                        : (v) => _toggleTwoFactor(v)),
                 activeColor: AppColors.orange600,
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),

@@ -7,6 +7,7 @@ import 'package:characters/characters.dart';
 
 import '../models/profile_service.dart';
 import '../models/profile_summary.dart';
+import '../utils/config.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/header.dart';
 import '../widgets/top_message.dart';
@@ -33,14 +34,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   bool _saving = false;
 
   static String _resolveBaseUrl() {
-    const overrideUrl = String.fromEnvironment('API_BASE_URL');
-    if (overrideUrl.isNotEmpty) {
-      return overrideUrl;
-    }
-    if (Platform.isAndroid) {
-      return 'http://192.168.1.155:8080';
-    }
-    return 'http://localhost:8080';
+    return AppConfig.getBaseUrlSync();
   }
 
   String _maskEmail(String value) {
@@ -85,6 +79,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         favoriteCount: _profile.favoriteCount,
         totalSpend: _profile.totalSpend,
         monthlySpend: _profile.monthlySpend,
+        twoFactorEnabled: _profile.twoFactorEnabled,
       );
     });
     await _saveProfile(avatarOnly: true);
@@ -335,6 +330,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                 favoriteCount: _profile.favoriteCount,
                                 totalSpend: _profile.totalSpend,
                                 monthlySpend: _profile.monthlySpend,
+                                twoFactorEnabled: _profile.twoFactorEnabled,
                               );
                             });
                             _saveProfile();
@@ -370,6 +366,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                                 favoriteCount: _profile.favoriteCount,
                                 totalSpend: _profile.totalSpend,
                                 monthlySpend: _profile.monthlySpend,
+                                twoFactorEnabled: _profile.twoFactorEnabled,
                               );
                             });
                             _saveProfile();

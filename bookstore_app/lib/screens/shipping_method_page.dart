@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../models/shipping_method.dart';
 import '../models/shipping_method_service.dart';
+import '../utils/config.dart';
 import '../utils/date_formatter.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/price_formatter.dart';
@@ -36,14 +37,7 @@ class _ShippingMethodPageState extends State<ShippingMethodPage> {
   }
 
   static String _resolveBaseUrl() {
-    const overrideUrl = String.fromEnvironment('API_BASE_URL');
-    if (overrideUrl.isNotEmpty) {
-      return overrideUrl;
-    }
-    if (Platform.isAndroid) {
-      return 'http://192.168.1.155:8080';
-    }
-    return 'http://localhost:8080';
+    return AppConfig.getBaseUrlSync();
   }
 
   Future<void> _loadShippingMethods() async {

@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import '../models/order.dart';
 import '../models/order_service.dart';
 import '../models/review_service.dart';
+import '../utils/config.dart';
 import '../widgets/app_colors.dart';
 import 'review_order_page.dart';
 
@@ -39,12 +40,7 @@ class _ReviewListPageState extends State<ReviewListPage> {
   ];
 
   static String _resolveBaseUrl() {
-    const overrideUrl = String.fromEnvironment('API_BASE_URL');
-    if (overrideUrl.isNotEmpty) return overrideUrl;
-    if (Platform.isAndroid) {
-      return 'http://192.168.1.155:8080';
-    }
-    return 'http://localhost:8080';
+    return AppConfig.getBaseUrlSync();
   }
 
   @override

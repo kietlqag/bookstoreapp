@@ -8,11 +8,52 @@ class AuthService {
 
   final String baseUrl;
 
-  Future<AuthSession> login({required String email, required String password}) {
-    return _postAuth('/api/auth/login', {
-      'email': email,
-      'password': password,
-    });
+  Future<dynamic> login({required String email, required String password}) async {
+    final client = HttpClient();
+    try {
+      final uri = Uri.parse('$baseUrl/api/auth/login');
+      print('🔗 Attempting login to: $uri');
+      final request = await client.postUrl(uri);
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode({
+        'email': email,
+        'password': password,
+      }));
+
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw AuthException(_extractMessage(body) ?? 'Authentication failed.');
+      }
+
+      if (body.isEmpty) {
+        throw AuthException('Empty response from server.');
+      }
+
+      final data = jsonDecode(body) as Map<String, dynamic>;
+      
+      // Check if 2FA is required
+      if (data['requiresTwoFactor'] == true) {
+        return {
+          'requiresTwoFactor': true,
+          'message': data['message']?.toString() ?? 'Mã OTP đã được gửi đến email của bạn.',
+        };
+      }
+
+      // Normal login response
+      final session = AuthSession.fromJson(data);
+      if (session.token.isEmpty || session.userId == 0) {
+        throw AuthException('Invalid response from server.');
+      }
+      return session;
+    } on SocketException {
+      throw AuthException('Cannot connect to server.');
+    } on FormatException {
+      throw AuthException('Invalid response format.');
+    } finally {
+      client.close(force: true);
+    }
   }
 
   Future<void> requestRegisterOtp({
@@ -71,32 +112,124 @@ class AuthService {
     });
   }
 
-  Future<AuthSession> socialRegister({
+  Future<AuthSession> verifyLoginOtp({
+    required String email,
+    required String code,
+  }) {
+    final payload = <String, dynamic>{
+      'email': email,
+      'code': code,
+    };
+    return _postAuth('/api/auth/verify-login-otp', payload);
+  }
+
+  Future<dynamic> socialRegister({
     required String provider,
     required String providerUserId,
     required String fullName,
-  }) {
-    final payload = <String, dynamic>{
-      'provider': provider,
-      'providerUserId': providerUserId,
-      'fullName': fullName,
-    };
-    return _postAuth('/api/auth/social/register', payload);
+  }) async {
+    final client = HttpClient();
+    try {
+      final uri = Uri.parse('$baseUrl/api/auth/social/register');
+      final request = await client.postUrl(uri);
+      request.headers.contentType = ContentType.json;
+      request.write(jsonEncode({
+        'provider': provider,
+        'providerUserId': providerUserId,
+        'fullName': fullName,
+      }));
+
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw AuthException(_extractMessage(body) ?? 'Authentication failed.');
+      }
+
+      if (body.isEmpty) {
+        throw AuthException('Empty response from server.');
+      }
+
+      final data = jsonDecode(body) as Map<String, dynamic>;
+      
+      // Check if 2FA is required
+      if (data['requiresTwoFactor'] == true) {
+        return {
+          'requiresTwoFactor': true,
+          'email': data['email']?.toString() ?? '',
+          'message': data['message']?.toString() ?? 'Mã OTP đã được gửi đến email của bạn.',
+        };
+      }
+
+      // Normal login response
+      final session = AuthSession.fromJson(data);
+      if (session.token.isEmpty || session.userId == 0) {
+        throw AuthException('Invalid response from server.');
+      }
+      return session;
+    } on SocketException {
+      throw AuthException('Cannot connect to server.');
+    } on FormatException {
+      throw AuthException('Invalid response format.');
+    } finally {
+      client.close(force: true);
+    }
   }
 
-  Future<AuthSession> socialLogin({
+  Future<dynamic> socialLogin({
     required String provider,
     required String providerUserId,
     String? email,
-  }) {
-    final payload = <String, dynamic>{
-      'provider': provider,
-      'providerUserId': providerUserId,
-    };
-    if (email != null && email.trim().isNotEmpty) {
-      payload['email'] = email.trim();
+  }) async {
+    final client = HttpClient();
+    try {
+      final uri = Uri.parse('$baseUrl/api/auth/social/login');
+      final request = await client.postUrl(uri);
+      request.headers.contentType = ContentType.json;
+      final payload = <String, dynamic>{
+        'provider': provider,
+        'providerUserId': providerUserId,
+      };
+      if (email != null && email.trim().isNotEmpty) {
+        payload['email'] = email.trim();
+      }
+      request.write(jsonEncode(payload));
+
+      final response = await request.close();
+      final body = await response.transform(utf8.decoder).join();
+
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw AuthException(_extractMessage(body) ?? 'Authentication failed.');
+      }
+
+      if (body.isEmpty) {
+        throw AuthException('Empty response from server.');
+      }
+
+      final data = jsonDecode(body) as Map<String, dynamic>;
+      
+      // Check if 2FA is required
+      if (data['requiresTwoFactor'] == true) {
+        return {
+          'requiresTwoFactor': true,
+          'email': data['email']?.toString() ?? '',
+          'message': data['message']?.toString() ?? 'Mã OTP đã được gửi đến email của bạn.',
+        };
+      }
+
+      // Normal login response
+      final session = AuthSession.fromJson(data);
+      if (session.token.isEmpty || session.userId == 0) {
+        throw AuthException('Invalid response from server.');
+      }
+      return session;
+    } on SocketException {
+      throw AuthException('Cannot connect to server.');
+    } on FormatException {
+      throw AuthException('Invalid response format.');
+    } finally {
+      client.close(force: true);
     }
-    return _postAuth('/api/auth/social/login', payload);
   }
 
   Future<AuthSession> _postAuth(
@@ -170,6 +303,15 @@ class AuthService {
       return null;
     }
   }
+}
+
+class TwoFactorRequiredException implements Exception {
+  TwoFactorRequiredException({required this.email, required this.message});
+  final String email;
+  final String message;
+  
+  @override
+  String toString() => message;
 }
 
 class AuthException implements Exception {

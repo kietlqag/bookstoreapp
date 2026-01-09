@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../models/address.dart';
 import '../models/address_service.dart';
+import '../utils/config.dart';
 import '../widgets/app_colors.dart';
 import '../widgets/header.dart';
 import 'address_form_page.dart';
@@ -39,14 +40,7 @@ class _AddressListPageState extends State<AddressListPage> {
   }
 
   static String _resolveBaseUrl() {
-    const overrideUrl = String.fromEnvironment('API_BASE_URL');
-    if (overrideUrl.isNotEmpty) {
-      return overrideUrl;
-    }
-    if (Platform.isAndroid) {
-      return 'http://192.168.1.155:8080';
-    }
-    return 'http://localhost:8080';
+    return AppConfig.getBaseUrlSync();
   }
 
   static List<String> _splitAddressLines(String value) {

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../models/support_service.dart';
+import '../utils/config.dart';
 import '../utils/date_formatter.dart';
 import '../widgets/app_colors.dart';
 import 'support_request_detail_page.dart';
@@ -28,12 +29,7 @@ class _SupportRequestListPageState extends State<SupportRequestListPage> {
   String? _error;
 
   static String _resolveBaseUrl() {
-    const overrideUrl = String.fromEnvironment('API_BASE_URL');
-    if (overrideUrl.isNotEmpty) return overrideUrl;
-    if (Platform.isAndroid) {
-      return 'http://192.168.1.155:8080';
-    }
-    return 'http://localhost:8080';
+    return AppConfig.getBaseUrlSync();
   }
 
   @override

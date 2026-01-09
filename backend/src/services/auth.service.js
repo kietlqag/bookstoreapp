@@ -151,6 +151,97 @@ async function login({ email, password }) {
     throw error;
   }
 
+  // Check if 2FA is enabled
+  if (user.twoFactorEnabled) {
+    // Send OTP for 2FA verification
+    if (!user.email || user.email.trim() === '') {
+      const error = new Error('Vui lòng cập nhật email để sử dụng xác thực 2 lớp.');
+      error.status = 400;
+      error.code = 'EMAIL_REQUIRED';
+      throw error;
+    }
+
+    const code = generateOtpCode();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes for login OTP
+
+    // Delete old OTPs for this email
+    await otpRepository.deleteByEmail(user.email);
+
+    // Create new OTP for 2FA login
+    await otpRepository.createResetPasswordOtp({
+      email: user.email,
+      code,
+      expiresAt,
+    });
+
+    // Send OTP email
+    try {
+      await sendOtpEmail({ to: user.email, code });
+    } catch (emailError) {
+      console.error(`Failed to send 2FA OTP email to ${user.email}:`, emailError);
+      const error = new Error('Không thể gửi mã OTP. Vui lòng thử lại sau.');
+      error.status = 500;
+      throw error;
+    }
+
+    // Return response indicating 2FA is required
+    return {
+      requiresTwoFactor: true,
+      message: 'Mã OTP đã được gửi đến email của bạn.',
+    };
+  }
+
+  return signSession(user);
+}
+
+async function verifyLoginOtp({ email, code }) {
+  const user = await userRepository.findByEmail(email);
+  if (!user) {
+    const error = new Error('Tài khoản không tồn tại.');
+    error.status = 404;
+    throw error;
+  }
+
+  if (!user.twoFactorEnabled) {
+    const error = new Error('Xác thực 2 lớp chưa được bật.');
+    error.status = 400;
+    throw error;
+  }
+
+  // Verify OTP
+  const otp = await otpRepository.findLatestByEmail(email);
+  if (!otp) {
+    const error = new Error('OTP not found. Please login again.');
+    error.status = 404;
+    throw error;
+  }
+
+  if (otp.verifiedAt) {
+    const error = new Error('OTP already used. Please login again.');
+    error.status = 400;
+    throw error;
+  }
+
+  if (new Date(otp.expiresAt).getTime() < Date.now()) {
+    const error = new Error('OTP expired. Please login again.');
+    error.status = 400;
+    throw error;
+  }
+
+  if (otp.code !== code) {
+    await otpRepository.incrementAttempts(otp.id);
+    const error = new Error('Mã OTP không đúng.');
+    error.status = 400;
+    throw error;
+  }
+
+  // Mark OTP as verified
+  await otpRepository.markVerified(otp.id);
+
+  // Delete OTP after successful verification
+  await otpRepository.deleteByEmail(email);
+
+  // Return session
   return signSession(user);
 }
 
@@ -164,6 +255,48 @@ async function socialRegister({ provider, providerUserId, fullName }) {
       error.status = 403;
       throw error;
     }
+
+    // Check if 2FA is enabled (existing user logging in via social)
+    if (existingByProvider.twoFactorEnabled) {
+      // Send OTP for 2FA verification
+      if (!existingByProvider.email || existingByProvider.email.trim() === '') {
+        const error = new Error('Vui lòng cập nhật email để sử dụng xác thực 2 lớp.');
+        error.status = 400;
+        error.code = 'EMAIL_REQUIRED';
+        throw error;
+      }
+
+      const code = generateOtpCode();
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes for login OTP
+
+      // Delete old OTPs for this email
+      await otpRepository.deleteByEmail(existingByProvider.email);
+
+      // Create new OTP for 2FA login
+      await otpRepository.createResetPasswordOtp({
+        email: existingByProvider.email,
+        code,
+        expiresAt,
+      });
+
+      // Send OTP email
+      try {
+        await sendOtpEmail({ to: existingByProvider.email, code });
+      } catch (emailError) {
+        console.error(`Failed to send 2FA OTP email to ${existingByProvider.email}:`, emailError);
+        const error = new Error('Không thể gửi mã OTP. Vui lòng thử lại sau.');
+        error.status = 500;
+        throw error;
+      }
+
+      // Return response indicating 2FA is required
+      return {
+        requiresTwoFactor: true,
+        email: existingByProvider.email,
+        message: 'Mã OTP đã được gửi đến email của bạn.',
+      };
+    }
+
     return signSession(existingByProvider);
   }
 
@@ -192,6 +325,47 @@ async function socialLogin({ provider, providerUserId }) {
     const error = new Error('Tài khoản đang bị vô hiệu hóa.');
     error.status = 403;
     throw error;
+  }
+
+  // Check if 2FA is enabled
+  if (user.twoFactorEnabled) {
+    // Send OTP for 2FA verification
+    if (!user.email || user.email.trim() === '') {
+      const error = new Error('Vui lòng cập nhật email để sử dụng xác thực 2 lớp.');
+      error.status = 400;
+      error.code = 'EMAIL_REQUIRED';
+      throw error;
+    }
+
+    const code = generateOtpCode();
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes for login OTP
+
+    // Delete old OTPs for this email
+    await otpRepository.deleteByEmail(user.email);
+
+    // Create new OTP for 2FA login
+    await otpRepository.createResetPasswordOtp({
+      email: user.email,
+      code,
+      expiresAt,
+    });
+
+    // Send OTP email
+    try {
+      await sendOtpEmail({ to: user.email, code });
+    } catch (emailError) {
+      console.error(`Failed to send 2FA OTP email to ${user.email}:`, emailError);
+      const error = new Error('Không thể gửi mã OTP. Vui lòng thử lại sau.');
+      error.status = 500;
+      throw error;
+    }
+
+    // Return response indicating 2FA is required
+    return {
+      requiresTwoFactor: true,
+      email: user.email,
+      message: 'Mã OTP đã được gửi đến email của bạn.',
+    };
   }
 
   return signSession(user);
@@ -380,4 +554,5 @@ module.exports = {
   forgotPassword,
   verifyResetOtp,
   resetPassword,
+  verifyLoginOtp,
 };

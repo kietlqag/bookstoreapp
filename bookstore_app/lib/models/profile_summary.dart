@@ -17,6 +17,7 @@ class ProfileSummary {
     required this.favoriteCount,
     required this.totalSpend,
     required this.monthlySpend,
+    required this.twoFactorEnabled,
   });
 
   final int id;
@@ -36,6 +37,7 @@ class ProfileSummary {
   final int favoriteCount;
   final double totalSpend;
   final double monthlySpend;
+  final bool twoFactorEnabled;
 
   factory ProfileSummary.fromJson(Map<String, dynamic> json) {
     return ProfileSummary(
@@ -62,6 +64,7 @@ class ProfileSummary {
       totalSpend: double.tryParse(json['totalSpend']?.toString() ?? '') ?? 0.0,
       monthlySpend:
           double.tryParse(json['monthlySpend']?.toString() ?? '') ?? 0.0,
+      twoFactorEnabled: json['twoFactorEnabled'] == true,
     );
   }
 }

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../models/payment_method.dart';
 import '../models/payment_method_service.dart';
+import '../utils/config.dart';
 import '../widgets/app_colors.dart';
 
 class PaymentMethodPage extends StatefulWidget {
@@ -34,14 +35,7 @@ class _PaymentMethodPageState extends State<PaymentMethodPage> {
   }
 
   static String _resolveBaseUrl() {
-    const overrideUrl = String.fromEnvironment('API_BASE_URL');
-    if (overrideUrl.isNotEmpty) {
-      return overrideUrl;
-    }
-    if (Platform.isAndroid) {
-      return 'http://192.168.1.155:8080';
-    }
-    return 'http://localhost:8080';
+    return AppConfig.getBaseUrlSync();
   }
 
   Future<void> _loadPaymentMethods() async {

@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_facebook_auth/flutter_facebook_auth.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
-import 'models/auth_service.dart' show AuthService, AuthException;
+import 'models/auth_service.dart' show AuthService, AuthException, TwoFactorRequiredException;
 import 'models/auth_session.dart';
 import 'models/book.dart';
 import 'models/book_service.dart';
@@ -23,6 +23,7 @@ import 'screens/auth/welcome_page.dart';
 import 'screens/book_detail_page.dart';
 import 'screens/home_page.dart';
 import 'widgets/app_colors.dart';
+import 'utils/config.dart';
 
 void main() {
   runApp(const BookStoreApp());
@@ -257,26 +258,48 @@ class _BookStoreAppState extends State<BookStoreApp> {
   Set<int> _favoriteIds = <int>{};
 
   static String _resolveBaseUrl() {
-    const overrideUrl = String.fromEnvironment('API_BASE_URL');
-    if (overrideUrl.isNotEmpty) {
-      return overrideUrl;
-    }
-    if (Platform.isAndroid) {
-      return 'http://192.168.1.155:8080';
-    }
-    return 'http://localhost:8080';
+    return AppConfig.getBaseUrlSync();
   }
 
   Future<void> _login(String email, String password) async {
     try {
-      final session = await _authService.login(email: email, password: password);
-      _applySession(session);
+      final result = await _authService.login(email: email, password: password);
+      
+      // Check if 2FA is required
+      if (result is Map && result['requiresTwoFactor'] == true) {
+        // Return the 2FA requirement info to login page
+        throw TwoFactorRequiredException(
+          email: email,
+          message: result['message']?.toString() ?? 'Mã OTP đã được gửi đến email của bạn.',
+        );
+      }
+      
+      // Normal login - result is AuthSession
+      if (result is AuthSession) {
+        _applySession(result);
+      } else {
+        throw AuthException('Invalid response from server.');
+      }
+    } on TwoFactorRequiredException {
+      // Re-throw để login_page có thể xử lý
+      rethrow;
     } on AuthException catch (e) {
       // Re-throw AuthException để login_page có thể hiển thị message cụ thể
       rethrow;
     } catch (e) {
       // Nếu không phải AuthException, wrap thành AuthException
       throw AuthException('Đăng nhập thất bại. Vui lòng thử lại sau.');
+    }
+  }
+
+  Future<void> _verifyLoginOtp(String email, String code) async {
+    try {
+      final session = await _authService.verifyLoginOtp(email: email, code: code);
+      _applySession(session);
+    } on AuthException catch (e) {
+      rethrow;
+    } catch (e) {
+      throw AuthException('Xác thực OTP thất bại. Vui lòng thử lại.');
     }
   }
 
@@ -298,6 +321,7 @@ class _BookStoreAppState extends State<BookStoreApp> {
   }
 
   Future<void> _socialRegister(String provider) async {
+    String? email;
     if (provider == 'google') {
       try {
         final googleSignIn = GoogleSignIn(scopes: ['email']);
@@ -305,16 +329,30 @@ class _BookStoreAppState extends State<BookStoreApp> {
         if (account == null) {
           throw Exception('Đăng ký Google bị hủy hoặc thất bại.');
         }
-      final displayName = account.displayName?.trim();
-      final session = await _authService.socialRegister(
-        provider: 'google',
-        providerUserId: account.id,
-        fullName: displayName != null && displayName.isNotEmpty
-            ? displayName
-            : 'Google user',
-      );
-      _applySession(session);
-      return;
+        email = account.email;
+        final displayName = account.displayName?.trim();
+        final result = await _authService.socialRegister(
+          provider: 'google',
+          providerUserId: account.id,
+          fullName: displayName != null && displayName.isNotEmpty
+              ? displayName
+              : 'Google user',
+        );
+        
+        // Check if 2FA is required
+        if (result is Map && result['requiresTwoFactor'] == true) {
+          throw TwoFactorRequiredException(
+            email: result['email']?.toString() ?? email ?? '',
+            message: result['message']?.toString() ?? 'Mã OTP đã được gửi đến email của bạn.',
+          );
+        }
+        
+        if (result is AuthSession) {
+          _applySession(result);
+        }
+        return;
+      } on TwoFactorRequiredException {
+        rethrow;
       } catch (error) {
         debugPrint('Google register error: $error');
         rethrow;
@@ -322,28 +360,48 @@ class _BookStoreAppState extends State<BookStoreApp> {
     }
 
     if (provider == 'facebook') {
-      final result = await FacebookAuth.instance.login();
-      if (result.status != LoginStatus.success) {
-        throw Exception('Facebook login failed.');
+      try {
+        final result = await FacebookAuth.instance.login();
+        if (result.status != LoginStatus.success) {
+          throw Exception('Facebook login failed.');
+        }
+        final data = await FacebookAuth.instance.getUserData(
+          fields: 'email,name',
+        );
+        final providerUserId = data['id']?.toString() ?? '';
+        final fullName = data['name']?.toString() ?? 'Facebook user';
+        email = data['email']?.toString();
+        if (providerUserId.isEmpty) {
+          throw Exception('Facebook account not found.');
+        }
+        final session = await _authService.socialRegister(
+          provider: 'facebook',
+          providerUserId: providerUserId,
+          fullName: fullName,
+        );
+        
+        // Check if 2FA is required
+        if (session is Map && session['requiresTwoFactor'] == true) {
+          throw TwoFactorRequiredException(
+            email: session['email']?.toString() ?? email ?? '',
+            message: session['message']?.toString() ?? 'Mã OTP đã được gửi đến email của bạn.',
+          );
+        }
+        
+        if (session is AuthSession) {
+          _applySession(session);
+        }
+      } on TwoFactorRequiredException {
+        rethrow;
+      } catch (error) {
+        debugPrint('Facebook register error: $error');
+        rethrow;
       }
-      final data = await FacebookAuth.instance.getUserData(
-        fields: 'email,name',
-      );
-      final providerUserId = data['id']?.toString() ?? '';
-      final fullName = data['name']?.toString() ?? 'Facebook user';
-      if (providerUserId.isEmpty) {
-        throw Exception('Facebook account not found.');
-      }
-      final session = await _authService.socialRegister(
-        provider: 'facebook',
-        providerUserId: providerUserId,
-        fullName: fullName,
-      );
-      _applySession(session);
     }
   }
 
   Future<void> _socialLogin(String provider) async {
+    String? email;
     if (provider == 'google') {
       try {
         final googleSignIn = GoogleSignIn(scopes: ['email']);
@@ -351,13 +409,27 @@ class _BookStoreAppState extends State<BookStoreApp> {
         if (account == null) {
           throw AuthException('Đăng nhập Google bị hủy hoặc thất bại.');
         }
-        final session = await _authService.socialLogin(
+        email = account.email;
+        final result = await _authService.socialLogin(
           provider: 'google',
           providerUserId: account.id,
           email: account.email,
         );
-        _applySession(session);
+        
+        // Check if 2FA is required
+        if (result is Map && result['requiresTwoFactor'] == true) {
+          throw TwoFactorRequiredException(
+            email: result['email']?.toString() ?? email ?? '',
+            message: result['message']?.toString() ?? 'Mã OTP đã được gửi đến email của bạn.',
+          );
+        }
+        
+        if (result is AuthSession) {
+          _applySession(result);
+        }
         return;
+      } on TwoFactorRequiredException {
+        rethrow;
       } on AuthException {
         rethrow;
       } catch (error) {
@@ -378,16 +450,29 @@ class _BookStoreAppState extends State<BookStoreApp> {
           fields: 'email,name',
         );
         final providerUserId = data['id']?.toString() ?? '';
-        final email = data['email']?.toString() ?? '';
+        email = data['email']?.toString() ?? '';
         if (providerUserId.isEmpty) {
           throw AuthException('Không tìm thấy tài khoản Facebook.');
         }
-        final session = await _authService.socialLogin(
+        final loginResult = await _authService.socialLogin(
           provider: 'facebook',
           providerUserId: providerUserId,
           email: email,
         );
-        _applySession(session);
+        
+        // Check if 2FA is required
+        if (loginResult is Map && loginResult['requiresTwoFactor'] == true) {
+          throw TwoFactorRequiredException(
+            email: loginResult['email']?.toString() ?? email ?? '',
+            message: loginResult['message']?.toString() ?? 'Mã OTP đã được gửi đến email của bạn.',
+          );
+        }
+        
+        if (loginResult is AuthSession) {
+          _applySession(loginResult);
+        }
+      } on TwoFactorRequiredException {
+        rethrow;
       } on AuthException {
         rethrow;
       } catch (error) {
@@ -403,26 +488,8 @@ class _BookStoreAppState extends State<BookStoreApp> {
     });
     _loadCartForUser(session.userId);
     _loadFavoritesForUser(session.userId);
-    _navigatorKey.currentState?.pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (_) => HomePage(
-          books: _books,
-          cartItems: _cartItems,
-          favoriteIds: _favoriteIds,
-          categoryService: _categoryService,
-          onOpenBook: _openBookDetail,
-          onIncreaseCart: _increaseCart,
-          onDecreaseCart: _decreaseCart,
-          onRemoveCart: _removeCart,
-          onOrderCompleted: _removeCartItemsLocal,
-          onToggleFavorite: _toggleFavorite,
-          onLogout: _logout,
-          userId: session.userId,
-          token: session.token,
-        ),
-      ),
-      (route) => false,
-    );
+    // Không cần pushAndRemoveUntil vì MaterialApp đã tự động switch
+    // giữa LoginPage và HomePage dựa trên _session state
   }
 
   Future<void> _loadWelcomeFlag() async {
@@ -491,18 +558,8 @@ class _BookStoreAppState extends State<BookStoreApp> {
       _cartItems = [];
       _favoriteIds = <int>{};
     });
-    _navigatorKey.currentState?.pushAndRemoveUntil(
-      MaterialPageRoute(
-        builder: (_) => LoginPage(
-          onLogin: _login,
-          onRegister: _openRegister,
-          onForgot: _openForgot,
-          onGoogleLogin: () => _socialLogin('google'),
-          onFacebookLogin: () => _socialLogin('facebook'),
-        ),
-      ),
-      (route) => false,
-    );
+    // Không cần pushAndRemoveUntil vì MaterialApp đã tự động switch
+    // giữa HomePage và LoginPage dựa trên _session state
   }
 
   void _addToCart(Book book) {
@@ -651,6 +708,7 @@ class _BookStoreAppState extends State<BookStoreApp> {
       MaterialPageRoute(
         builder: (_) => LoginPage(
           onLogin: _login,
+          onVerifyOtp: _verifyLoginOtp,
           onRegister: _openRegister,
           onForgot: _openForgot,
           onGoogleLogin: () => _socialLogin('google'),
@@ -737,6 +795,7 @@ class _BookStoreAppState extends State<BookStoreApp> {
           : (_hasSeenWelcome
               ? LoginPage(
                   onLogin: _login,
+                  onVerifyOtp: _verifyLoginOtp,
                   onRegister: _openRegister,
                   onForgot: _openForgot,
                   onGoogleLogin: () => _socialLogin('google'),

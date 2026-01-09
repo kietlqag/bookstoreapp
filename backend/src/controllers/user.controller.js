@@ -195,6 +195,52 @@ async function verifyAccountDeletion(req, res, next) {
   }
 }
 
+async function enableTwoFactor(req, res, next) {
+  try {
+    const { id } = req.params;
+    const userId = parseInt(id, 10);
+    if (isNaN(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID.' });
+    }
+
+    // Verify that the authenticated user is enabling 2FA for their own account
+    if (req.user && req.user.id !== userId) {
+      return res.status(403).json({ message: 'You can only enable 2FA for your own account.' });
+    }
+
+    const result = await userService.enableTwoFactor(userId);
+    return res.json(result);
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ message: error.message });
+    }
+    return next(error);
+  }
+}
+
+async function disableTwoFactor(req, res, next) {
+  try {
+    const { id } = req.params;
+    const userId = parseInt(id, 10);
+    if (isNaN(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID.' });
+    }
+
+    // Verify that the authenticated user is disabling 2FA for their own account
+    if (req.user && req.user.id !== userId) {
+      return res.status(403).json({ message: 'You can only disable 2FA for your own account.' });
+    }
+
+    const result = await userService.disableTwoFactor(userId);
+    return res.json(result);
+  } catch (error) {
+    if (error.status) {
+      return res.status(error.status).json({ message: error.message });
+    }
+    return next(error);
+  }
+}
+
 module.exports = {
   getUser,
   getUserSummary,
@@ -206,4 +252,6 @@ module.exports = {
   changePassword,
   requestAccountDeletion,
   verifyAccountDeletion,
+  enableTwoFactor,
+  disableTwoFactor,
 };

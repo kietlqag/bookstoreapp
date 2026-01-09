@@ -18,6 +18,7 @@ import '../widgets/header.dart';
 import '../widgets/price_formatter.dart';
 import '../widgets/search_bar.dart';
 import '../widgets/top_message.dart';
+import '../utils/config.dart';
 import 'cart_page.dart';
 import 'category_books_page.dart';
 import 'contact_page.dart';
@@ -137,14 +138,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   static String _resolveBaseUrl() {
-    const overrideUrl = String.fromEnvironment('API_BASE_URL');
-    if (overrideUrl.isNotEmpty) {
-      return overrideUrl;
-    }
-    if (Platform.isAndroid) {
-      return 'http://192.168.1.155:8080';
-    }
-    return 'http://localhost:8080';
+    return AppConfig.getBaseUrlSync();
   }
 
   @override

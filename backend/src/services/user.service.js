@@ -357,6 +357,58 @@ async function verifyAccountDeletion(userId, code) {
   };
 }
 
+async function enableTwoFactor(userId) {
+  const user = await userRepository.findById(userId);
+  if (!user) {
+    const error = new Error('User not found.');
+    error.status = 404;
+    throw error;
+  }
+
+  // Check if user has email
+  if (!user.email || user.email.trim() === '') {
+    const error = new Error('Vui lòng cập nhật email trước khi bật xác thực 2 lớp.');
+    error.status = 400;
+    error.code = 'EMAIL_REQUIRED';
+    throw error;
+  }
+
+  // Enable 2FA
+  const updated = await userRepository.updateTwoFactorEnabled(userId, true);
+  if (!updated) {
+    const error = new Error('Failed to enable two-factor authentication.');
+    error.status = 500;
+    throw error;
+  }
+
+  return {
+    ok: true,
+    message: 'Xác thực 2 lớp đã được bật.',
+  };
+}
+
+async function disableTwoFactor(userId) {
+  const user = await userRepository.findById(userId);
+  if (!user) {
+    const error = new Error('User not found.');
+    error.status = 404;
+    throw error;
+  }
+
+  // Disable 2FA
+  const updated = await userRepository.updateTwoFactorEnabled(userId, false);
+  if (!updated) {
+    const error = new Error('Failed to disable two-factor authentication.');
+    error.status = 500;
+    throw error;
+  }
+
+  return {
+    ok: true,
+    message: 'Xác thực 2 lớp đã được tắt.',
+  };
+}
+
 module.exports = {
   getUserProfile,
   getUserSummary,
@@ -368,4 +420,6 @@ module.exports = {
   changePassword,
   requestAccountDeletion,
   verifyAccountDeletion,
+  enableTwoFactor,
+  disableTwoFactor,
 };

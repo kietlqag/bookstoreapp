@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../models/support_service.dart';
+import '../utils/config.dart';
 import '../utils/date_formatter.dart';
 import '../widgets/app_colors.dart';
 
@@ -31,12 +32,7 @@ class _SupportRequestDetailPageState extends State<SupportRequestDetailPage> {
   String? _error;
 
   static String _resolveBaseUrl() {
-    const overrideUrl = String.fromEnvironment('API_BASE_URL');
-    if (overrideUrl.isNotEmpty) return overrideUrl;
-    if (Platform.isAndroid) {
-      return 'http://192.168.1.155:8080';
-    }
-    return 'http://localhost:8080';
+    return AppConfig.getBaseUrlSync();
   }
 
   @override

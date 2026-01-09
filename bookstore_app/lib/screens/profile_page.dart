@@ -13,6 +13,7 @@ import 'settings_notification_page.dart';
 import 'settings_help_page.dart';
 import 'settings_privacy_page.dart';
 import '../widgets/app_colors.dart';
+import '../utils/config.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({
@@ -40,14 +41,7 @@ class _ProfilePageState extends State<ProfilePage> {
   String? _error;
 
   static String _resolveBaseUrl() {
-    const overrideUrl = String.fromEnvironment('API_BASE_URL');
-    if (overrideUrl.isNotEmpty) {
-      return overrideUrl;
-    }
-    if (Platform.isAndroid) {
-      return 'http://192.168.1.155:8080';
-    }
-    return 'http://localhost:8080';
+    return AppConfig.getBaseUrlSync();
   }
 
   @override

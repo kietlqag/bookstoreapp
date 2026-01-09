@@ -148,6 +148,20 @@ async function resetPassword(req, res, next) {
   }
 }
 
+async function verifyLoginOtp(req, res, next) {
+  try {
+    const { email, code } = req.body || {};
+    if (!email || !code) {
+      return res.status(400).json({ message: 'Email and OTP are required.' });
+    }
+
+    const result = await authService.verifyLoginOtp({ email, code });
+    return res.json(result);
+  } catch (error) {
+    return handleError(error, res, next);
+  }
+}
+
 module.exports = {
   register,
   resend,
@@ -159,4 +173,5 @@ module.exports = {
   forgotPassword,
   verifyResetOtp,
   resetPassword,
+  verifyLoginOtp,
 };
