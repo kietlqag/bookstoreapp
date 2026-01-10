@@ -15,6 +15,7 @@ function mapBookRow(row) {
     year: row.year,
     categoryName: row.categoryName,
     stockQuantity: row.stockQuantity ?? 0,
+    remainingQuantity: row.remainingQuantity ?? 0,
     soldQuantity: row.soldQuantity ?? 0,
     rating: row.rating ?? 0,
     reviewCount: row.reviewCount ?? 0,
@@ -26,6 +27,7 @@ async function findAll() {
     'SELECT b.id, b.title, b.author, b.price, b.discount, b."imageUrl", '
       + 'b.description, b.pages, b.language, b.publisher, b.year, b."categoryName", '
       + 'COALESCE(i."totalQuantity", 0) AS "stockQuantity", '
+      + 'COALESCE(i."remainingQuantity", 0) AS "remainingQuantity", '
       + 'COALESCE(i."soldQuantity", 0) AS "soldQuantity", '
       + 'COALESCE(r.avg_rating, 0) AS rating, '
       + 'COALESCE(r.review_count, 0) AS "reviewCount" '
@@ -46,6 +48,7 @@ async function findById(id) {
     'SELECT b.id, b.title, b.author, b.price, b.discount, b."imageUrl", '
       + 'b.description, b.pages, b.language, b.publisher, b.year, b."categoryName", '
       + 'COALESCE(i."totalQuantity", 0) AS "stockQuantity", '
+      + 'COALESCE(i."remainingQuantity", 0) AS "remainingQuantity", '
       + 'COALESCE(i."soldQuantity", 0) AS "soldQuantity", '
       + 'COALESCE(r.avg_rating, 0) AS rating, '
       + 'COALESCE(r.review_count, 0) AS "reviewCount" '
@@ -73,6 +76,7 @@ async function searchBooks(query, limit = 5) {
     'SELECT b.id, b.title, b.author, b.price, b.discount, b."imageUrl", '
       + 'b.description, b.pages, b.language, b.publisher, b.year, b."categoryName", '
       + 'COALESCE(i."totalQuantity", 0) AS "stockQuantity", '
+      + 'COALESCE(i."remainingQuantity", 0) AS "remainingQuantity", '
       + 'COALESCE(i."soldQuantity", 0) AS "soldQuantity", '
       + 'COALESCE(r.avg_rating, 0) AS rating, '
       + 'COALESCE(r.review_count, 0) AS "reviewCount" '
@@ -100,6 +104,7 @@ async function getPopularBooks(limit = 5) {
     'SELECT b.id, b.title, b.author, b.price, b.discount, b."imageUrl", '
       + 'b.description, b.pages, b.language, b.publisher, b.year, b."categoryName", '
       + 'COALESCE(i."totalQuantity", 0) AS "stockQuantity", '
+      + 'COALESCE(i."remainingQuantity", 0) AS "remainingQuantity", '
       + 'COALESCE(i."soldQuantity", 0) AS "soldQuantity", '
       + 'COALESCE(r.avg_rating, 0) AS rating, '
       + 'COALESCE(r.review_count, 0) AS "reviewCount" '

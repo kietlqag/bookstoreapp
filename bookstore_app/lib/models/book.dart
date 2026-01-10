@@ -9,6 +9,7 @@
     required this.category,
     required this.description,
     this.stockQuantity = 0,
+    this.remainingQuantity = 0,
     this.soldQuantity = 0,
     this.discount = 0,
     this.reviewCount = 0,
@@ -27,6 +28,7 @@
   final String category;
   final String description;
   final int stockQuantity;
+  final int remainingQuantity;
   final int soldQuantity;
   final double discount;
   final int reviewCount;
@@ -70,6 +72,7 @@
       publisher: json['publisher']?.toString(),
       year: json['year'] as int?,
       stockQuantity: parseInt(json['stockQuantity']),
+      remainingQuantity: parseInt(json['remainingQuantity']),
       soldQuantity: parseInt(json['soldQuantity']),
       reviewCount: parseInt(json['reviewCount']),
     );

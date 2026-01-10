@@ -45,6 +45,9 @@ class BookCard extends StatelessWidget {
     final displayPrice =
         (book.price * (1 - discountRate)).clamp(0.0, double.infinity);
 
+    // Xét tồn kho: hết hàng khi stockQuantity <= 0
+    final isOutOfStock = book.stockQuantity <= 0;
+    
     return LayoutBuilder(
       builder: (context, constraints) {
         final maxHeight = constraints.maxHeight;
@@ -58,7 +61,7 @@ class BookCard extends StatelessWidget {
                 .toDouble();
 
         return InkWell(
-          onTap: onTap,
+          onTap: isOutOfStock ? null : onTap,
           borderRadius: BorderRadius.circular(16),
           child: Container(
             decoration: BoxDecoration(
@@ -84,24 +87,68 @@ class BookCard extends StatelessWidget {
                         borderRadius: const BorderRadius.vertical(
                           top: Radius.circular(16),
                         ),
-                        child: Image.network(
-                          book.cover,
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          height: double.infinity,
-                          errorBuilder: (_, __, ___) {
-                            return Container(
-                              color: AppColors.gray100,
-                              alignment: Alignment.center,
-                              child: const Icon(
-                                Icons.menu_book,
-                                color: AppColors.gray600,
-                                size: 32,
-                              ),
-                            );
-                          },
+                        child: ColorFiltered(
+                          colorFilter: isOutOfStock
+                              ? ColorFilter.mode(
+                                  Colors.black.withOpacity(0.5),
+                                  BlendMode.darken,
+                                )
+                              : const ColorFilter.mode(
+                                  Colors.transparent,
+                                  BlendMode.dst,
+                                ),
+                          child: Image.network(
+                            book.cover,
+                            fit: BoxFit.cover,
+                            width: double.infinity,
+                            height: double.infinity,
+                            errorBuilder: (_, __, ___) {
+                              return Container(
+                                color: AppColors.gray100,
+                                alignment: Alignment.center,
+                                child: const Icon(
+                                  Icons.menu_book,
+                                  color: AppColors.gray600,
+                                  size: 32,
+                                ),
+                              );
+                            },
+                          ),
                         ),
                       ),
+                      if (isOutOfStock)
+                        Positioned.fill(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.4),
+                              borderRadius: const BorderRadius.vertical(
+                                top: Radius.circular(16),
+                              ),
+                            ),
+                            alignment: Alignment.center,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.red500,
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                'ĐÃ HẾT',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .labelSmall
+                                    ?.copyWith(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11,
+                                    ),
+                              ),
+                            ),
+                          ),
+                        ),
                       Positioned(
                         right: 10,
                         top: 10,
@@ -190,31 +237,70 @@ class BookCard extends StatelessWidget {
                         ],
                       ),
                       SizedBox(height: spacingSm),
-                      Row(
-                        children: [
-                          Text(
-                            'Đã bán $sold/$totalStock',
-                            style:
-                                Theme.of(context).textTheme.labelSmall?.copyWith(
-                                      color: AppColors.gray600,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: compact ? 10 : 11,
-                                    ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(10),
-                              child: LinearProgressIndicator(
-                                value: progress,
-                                minHeight: progressHeight,
-                                backgroundColor: AppColors.gray100,
-                                color: AppColors.orange600,
+                      isOutOfStock
+                          ? Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
                               ),
+                              decoration: BoxDecoration(
+                                color: AppColors.red50,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: AppColors.red200,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.inventory_2_outlined,
+                                    size: 12,
+                                    color: AppColors.red600,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    'Đã hết hàng',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .labelSmall
+                                        ?.copyWith(
+                                          color: AppColors.red600,
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: compact ? 10 : 11,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : Row(
+                              children: [
+                                Text(
+                                  'Đã bán $sold/$totalStock',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .labelSmall
+                                      ?.copyWith(
+                                        color: AppColors.gray600,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: compact ? 10 : 11,
+                                      ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(10),
+                                    child: LinearProgressIndicator(
+                                      value: progress,
+                                      minHeight: progressHeight,
+                                      backgroundColor: AppColors.gray100,
+                                      color: AppColors.orange600,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
                     ],
                   ),
                 ),
