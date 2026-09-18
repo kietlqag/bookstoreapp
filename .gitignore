@@ -1,0 +1,33 @@
+# Dependencies
+backend/node_modules/
+
+# Environment files and secrets
+.env
+*.env
+backend/.env
+backend/.env.*
+
+# Temporary local scripts/files
+tmp_*.js
+tmp_*.txt
+
+# Flutter build/cache
+bookstore_app/build/
+bookstore_app/.dart_tool/
+bookstore_app/.flutter-plugins-dependencies
+
+# Firebase / Google services
+bookstore_app/android/app/google-services.json
+bookstore_app/ios/Runner/GoogleService-Info.plist
+
+# Signing keys / certificates
+*.jks
+*.keystore
+*.p12
+*.pem
+*.key
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
+.idea/
