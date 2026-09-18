@@ -15,19 +15,6 @@ Bookstore App is a mobile-first online bookstore built with Flutter, Node.js/Exp
 | Payment security | MoMo requests and callbacks use HMAC-SHA256 signatures. VietQR webhook handling updates by transaction reference/status and does not currently verify a signature or token. |
 | AI support | OpenAI Chat Completions can recommend real books and vouchers after validating model output against database records. |
 
-## Tổng Quan Dự Án
-
-| Hạng mục | Triển khai |
-| --- | --- |
-| Sản phẩm | Ứng dụng bán sách trên mobile, có duyệt sách, giỏ hàng, voucher, vận chuyển, thanh toán, đánh giá, thông báo và hỗ trợ khách hàng. |
-| Backend | REST API bằng Node.js/Express, tách lớp theo routes, controllers, services và repositories. |
-| Mobile | Ứng dụng Flutter gọi REST API, lưu session/base URL cục bộ và xử lý giao diện checkout. |
-| Cơ sở dữ liệu | PostgreSQL với schema cho user, OTP, sách, tồn kho, giỏ hàng, voucher, thanh toán, đơn hàng, review, support, notification và flash sale. |
-| Xác thực | Hash mật khẩu bằng bcrypt, JWT session, email OTP, reset mật khẩu và tùy chọn đăng nhập 2FA. |
-| Thanh toán | Hỗ trợ COD, MoMo payment URL/deeplink và sinh mã VietQR; mỗi lần thanh toán được lưu trong `PaymentTransaction`. |
-| Bảo mật thanh toán | MoMo request và callback được ký/kiểm tra bằng HMAC-SHA256. VietQR webhook hiện cập nhật theo transaction reference/status và chưa có signature/token verification. |
-| Hỗ trợ AI | OpenAI Chat Completions gợi ý sách/voucher thật trong database, sau đó backend validate ID/code trước khi trả về app. |
-
 ## Key Features
 
 - Browse books by category, search, view details, and manage favorites.
